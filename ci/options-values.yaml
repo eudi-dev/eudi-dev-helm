@@ -1,6 +1,7 @@
 # Wallet options. test/e2e.sh creates the secrets and the ConfigMap these values
-# reference, and passes the demo verifier trust anchors with --set-file.
+# reference, and passes the demo verifier issuer CAs and the relying party CAs with --set-file.
 haip: true
+arf: true
 statusList: true
 adhocDisplayImages: true
 issuance:
@@ -28,7 +29,5 @@ credentialTemplates:
       vct: urn:example:employee
       claims:
         employee_id: E-1
-importCredentials:
+credentials:
   existingConfigMap: e2e-credentials
-  existingConfigMapKeys:
-    - employee.sdjwt

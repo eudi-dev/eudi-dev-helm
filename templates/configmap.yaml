@@ -18,17 +18,21 @@ data:
   {{- if and .Values.imprint.html (not .Values.imprint.existingConfigMap) }}
   imprint.html: {{ .Values.imprint.html | quote }}
   {{- end }}
-  {{- if and .Values.demoVerifier.trustAnchors (not .Values.demoVerifier.existingTrustAnchorsSecret) }}
-  trust-anchors.pem: {{ .Values.demoVerifier.trustAnchors | quote }}
+  {{- if and .Values.demoVerifier.issuerCAs (not .Values.demoVerifier.existingIssuerCASecret) }}
+  demo-verifier-issuer-ca.pem: {{ .Values.demoVerifier.issuerCAs | quote }}
+  {{- end }}
+  {{- if and .Values.relyingPartyCAs (not .Values.existingRelyingPartyCASecret) }}
+  relying-party-ca.pem: {{ .Values.relyingPartyCAs | quote }}
   {{- end }}
   {{- if not .Values.credentialTemplates.existingConfigMap }}
   {{- range $name, $template := .Values.credentialTemplates.templates }}
   template-{{ include "eudi-dev.templateFileName" $name }}: {{ $template | toJson | quote }}
   {{- end }}
   {{- end }}
-  {{- if not .Values.importCredentials.existingConfigMap }}
-  {{- range $name, $credential := .Values.importCredentials.credentials }}
-  credential-{{ $name }}: {{ $credential | trim | quote }}
+  {{- if and .Values.credentials.items (not .Values.credentials.existingConfigMap) }}
+  credentials.yaml: {{ dict "credentials" .Values.credentials.items | toYaml | quote }}
   {{- end }}
+  {{- if include "eudi-dev.pidCredentialsEnabled" . }}
+  pid-credentials.yaml: {{ include "eudi-dev.pidCredentials" . | quote }}
   {{- end }}
 {{- end }}

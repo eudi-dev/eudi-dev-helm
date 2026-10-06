@@ -17,13 +17,7 @@ metadata:
   annotations: {{- include "common.tplvalues.render" (dict "value" $annotations "context" .) | nindent 4 }}
   {{- end }}
 spec:
-  parentRefs:
-  {{- if .Values.httpRoute.parentRefs }}
-    {{- include "common.tplvalues.render" (dict "value" .Values.httpRoute.parentRefs "context" .) | nindent 4 }}
-  {{- else }}
-    - name: gateway
-      namespace: {{ include "common.names.namespace" . | quote }}
-  {{- end }}
+  parentRefs: {{- include "common.tplvalues.render" (dict "value" .Values.httpRoute.parentRefs "context" .) | nindent 4 }}
   hostnames: {{- include "common.tplvalues.render" (dict "value" .Values.httpRoute.hostnames "context" .) | nindent 4 }}
   rules:
     - backendRefs:

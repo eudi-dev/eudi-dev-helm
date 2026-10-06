@@ -38,6 +38,7 @@ spec:
     - name: http
       port: {{ .Values.service.ports.http }}
       protocol: TCP
+      appProtocol: http
       targetPort: http
       {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePorts.http)) }}
       nodePort: {{ .Values.service.nodePorts.http }}
@@ -47,6 +48,7 @@ spec:
     - name: issuer
       port: {{ .Values.service.ports.issuer }}
       protocol: TCP
+      appProtocol: https
       targetPort: issuer
       {{- if and (or (eq .Values.service.type "NodePort") (eq .Values.service.type "LoadBalancer")) (not (empty .Values.service.nodePorts.issuer)) }}
       nodePort: {{ .Values.service.nodePorts.issuer }}

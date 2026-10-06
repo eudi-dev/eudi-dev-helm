@@ -43,8 +43,8 @@ CI lints the chart, checks the README, and runs the tests twice: with the image 
 
 ## Release
 
-1. Raise `version` in `Chart.yaml` (and `appVersion` and `image.tag` for a new eudi-dev release).
-2. Add an entry to `CHANGELOG.md`.
+1. Raise `version` in `Chart.yaml` (and `appVersion`, `image.tag` and the `artifacthub.io/images` annotation for a new eudi-dev release).
+2. Add an entry to `CHANGELOG.md` and the same changes to the `artifacthub.io/changes` annotation.
 3. Merge to `main`.
 
-The release workflow pushes a chart version that has no git tag yet to `oci://ghcr.io/dominikschlosser/charts` and creates a GitHub release with the packaged chart. The release and its git tag are named `v<version>`, such as `v0.1.0`.
+Once CI passes on `main`, the release workflow publishes each chart version without a git tag to `oci://ghcr.io/dominikschlosser/charts` and creates a GitHub release with the packaged chart. The release and its git tag are named `v<version>`, such as `v0.1.0`.

@@ -144,7 +144,7 @@ Return issuance.vciVersion as a string. YAML reads an unquoted 1.0 as a number.
 
 {{/*
 Return the name of the ConfigMap the chart creates for the imprint, the demo verifier
-trust anchors, the credential templates and the credentials to import
+issuer CAs, the relying party CAs, the credential templates and the startup credentials
 */}}
 {{- define "eudi-dev.configMapName" -}}
 {{- printf "%s-files" (include "common.names.fullname" .) | trunc 63 | trimSuffix "-" -}}
@@ -154,7 +154,7 @@ trust anchors, the credential templates and the credentials to import
 Return true when the chart creates its ConfigMap
 */}}
 {{- define "eudi-dev.createConfigMap" -}}
-{{- if or (and .Values.imprint.html (not .Values.imprint.existingConfigMap)) (and .Values.demoVerifier.trustAnchors (not .Values.demoVerifier.existingTrustAnchorsSecret)) (and .Values.credentialTemplates.templates (not .Values.credentialTemplates.existingConfigMap)) (and .Values.importCredentials.credentials (not .Values.importCredentials.existingConfigMap)) -}}
+{{- if or (and .Values.imprint.html (not .Values.imprint.existingConfigMap)) (and .Values.demoVerifier.issuerCAs (not .Values.demoVerifier.existingIssuerCASecret)) (and .Values.relyingPartyCAs (not .Values.existingRelyingPartyCASecret)) (and .Values.credentialTemplates.templates (not .Values.credentialTemplates.existingConfigMap)) (and .Values.credentials.items (not .Values.credentials.existingConfigMap)) (include "eudi-dev.pidCredentialsEnabled" .) -}}
     {{- true -}}
 {{- end -}}
 {{- end -}}
@@ -171,13 +171,35 @@ Return the file name of a credential template in the ConfigMap
 {{- end -}}
 
 {{/*
-Return the paths of the credentials to import, one per line
+Return true when the wallet adds startup credentials
 */}}
-{{- define "eudi-dev.importCredentialPaths" -}}
-{{- $keys := ternary .Values.importCredentials.existingConfigMapKeys (keys .Values.importCredentials.credentials | sortAlpha) (not (empty .Values.importCredentials.existingConfigMap)) -}}
-{{- range $keys }}
-{{ printf "/opt/eudi-dev/credentials/%s" . }}
+{{- define "eudi-dev.startupCredentials" -}}
+{{- if or .Values.credentials.items .Values.credentials.existingConfigMap (include "eudi-dev.pidCredentialsEnabled" .) -}}
+    {{- true -}}
 {{- end -}}
+{{- end -}}
+
+{{/*
+Return true when the wallet issues pidCredentials. The public demo brings its own PIDs, which every reset restores.
+*/}}
+{{- define "eudi-dev.pidCredentialsEnabled" -}}
+{{- if and .Values.pidCredentials (not .Values.demo.enabled) -}}
+    {{- true -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the startup credentials file for pidCredentials: one SD-JWT VC and one mdoc per PID template
+*/}}
+{{- define "eudi-dev.pidCredentials" -}}
+{{- $items := list -}}
+{{- range $pid := .Values.pidCredentials -}}
+{{- range $format := list "sdjwt" "mdoc" -}}
+{{- $name := printf "%s-%s" $pid $format -}}
+{{- $items = append $items (dict "id" $name "template" $name) -}}
+{{- end -}}
+{{- end -}}
+{{- dict "credentials" $items | toYaml -}}
 {{- end -}}
 
 {{/*
@@ -207,7 +229,7 @@ scheme uses http, as eudi-dev does.
 {{- end -}}
 
 {{/*
-Compile all warnings into a single message and fail on them
+Collect the validation errors into one message and fail on them
 */}}
 {{- define "eudi-dev.validateValues" -}}
 {{- $messages := list -}}
@@ -216,7 +238,9 @@ Compile all warnings into a single message and fail on them
 {{- $messages := append $messages (include "eudi-dev.validateValues.validationMode" .) -}}
 {{- $messages := append $messages (include "eudi-dev.validateValues.logFormat" .) -}}
 {{- $messages := append $messages (include "eudi-dev.validateValues.options" .) -}}
-{{- $messages := append $messages (include "eudi-dev.validateValues.importCredentials" .) -}}
+{{- $messages := append $messages (include "eudi-dev.validateValues.httpRoute" .) -}}
+{{- $messages := append $messages (include "eudi-dev.validateValues.ports" .) -}}
+{{- $messages := append $messages (include "eudi-dev.validateValues.renamed" .) -}}
 {{- $messages := without $messages "" -}}
 {{- $message := join "\n" $messages -}}
 {{- if $message -}}
@@ -261,6 +285,7 @@ Validate the values that eudi-dev accepts from a fixed list
 {{- define "eudi-dev.validateValues.options" -}}
 {{- $options := list
     (dict "name" "haip" "value" (toString .Values.haip) "allowed" (list "" "true" "false"))
+    (dict "name" "arf" "value" (toString .Values.arf) "allowed" (list "" "true" "false"))
     (dict "name" "issuance.vciVersion" "value" (include "eudi-dev.vciVersion" .) "allowed" (list "" "1.0" "1.1"))
     (dict "name" "issuance.keyAttestationLevel" "value" .Values.issuance.keyAttestationLevel "allowed" (list "" "none" "iso_18045_high" "iso_18045_moderate" "iso_18045_enhanced-basic" "iso_18045_basic"))
     (dict "name" "presentation.sessionTranscript" "value" .Values.presentation.sessionTranscript "allowed" (list "" "oid4vp" "iso"))
@@ -276,9 +301,54 @@ Validate the values that eudi-dev accepts from a fixed list
 {{- join "\n" $messages -}}
 {{- end -}}
 
-{{- define "eudi-dev.validateValues.importCredentials" -}}
-{{- if and .Values.importCredentials.existingConfigMap (not .Values.importCredentials.existingConfigMapKeys) -}}
-eudi-dev: importCredentials.existingConfigMapKeys
-    importCredentials.existingConfigMap needs the keys of the credentials to import in importCredentials.existingConfigMapKeys.
+
+{{/*
+Validate the HTTPRoute. The wallet cannot read the Gateway's public URL.
+*/}}
+{{- define "eudi-dev.validateValues.httpRoute" -}}
+{{- if .Values.httpRoute.enabled -}}
+{{- if not .Values.baseURL -}}
+eudi-dev: baseURL
+    httpRoute.enabled needs the public URL of the Gateway in baseURL.
+{{- else if not .Values.httpRoute.parentRefs -}}
+eudi-dev: httpRoute.parentRefs
+    httpRoute.enabled needs the Gateways in httpRoute.parentRefs.
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Validate the service ports. Without baseURL and ingress the wallet advertises its
+in-cluster service URL with the container ports, and its issuer on the next port.
+*/}}
+{{- define "eudi-dev.validateValues.ports" -}}
+{{- if and (not .Values.baseURL) (not .Values.ingress.enabled) -}}
+{{- if or (ne (int .Values.service.ports.http) (int .Values.containerPorts.http)) (ne (int .Values.service.ports.issuer) (add1 (int .Values.containerPorts.http))) -}}
+eudi-dev: service.ports
+    Without baseURL the wallet advertises {{ .Values.containerPorts.http }} and {{ add1 (int .Values.containerPorts.http) }}. Set service.ports.http and service.ports.issuer to these ports, or set baseURL.
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Validate that no value renamed in 1.0.0 is set, since the chart reads only the new names.
+*/}}
+{{- define "eudi-dev.validateValues.renamed" -}}
+{{- $renamed := list -}}
+{{- if .Values.importCredentials -}}
+{{- $renamed = append $renamed "use credentials instead of importCredentials" -}}
+{{- end -}}
+{{- if .Values.demoVerifier.trustAnchors -}}
+{{- $renamed = append $renamed "use demoVerifier.issuerCAs instead of demoVerifier.trustAnchors" -}}
+{{- end -}}
+{{- if hasKey .Values "generatePID" -}}
+{{- $renamed = append $renamed "use pidCredentials instead of generatePID" -}}
+{{- end -}}
+{{- if .Values.demoVerifier.existingTrustAnchorsSecret -}}
+{{- $renamed = append $renamed "use demoVerifier.existingIssuerCASecret instead of demoVerifier.existingTrustAnchorsSecret" -}}
+{{- end -}}
+{{- if $renamed -}}
+eudi-dev: renamed values
+    {{ join ". " $renamed }}. See "Upgrading to 1.0.0" in the README.
 {{- end -}}
 {{- end -}}

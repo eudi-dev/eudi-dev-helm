@@ -99,9 +99,6 @@ spec:
             {{- if .Values.autoAccept }}
             - --auto-accept
             {{- end }}
-            {{- if .Values.generatePID }}
-            - --pid
-            {{- end }}
             {{- if .Values.demo.enabled }}
             - --demo
             {{- if .Values.demo.reset }}
@@ -116,6 +113,12 @@ spec:
             {{- end }}
             {{- if ne (toString .Values.haip) "" }}
             - --haip={{ .Values.haip }}
+            {{- end }}
+            {{- if ne (toString .Values.arf) "" }}
+            - --arf={{ .Values.arf }}
+            {{- end }}
+            {{- if or .Values.relyingPartyCAs .Values.existingRelyingPartyCASecret }}
+            - --relying-party-ca=/opt/eudi-dev/relying-party-ca/ca.pem
             {{- end }}
             {{- if .Values.statusList }}
             - --status-list
@@ -150,8 +153,8 @@ spec:
             {{- if .Values.demoIssuer.clientAuth }}
             - --demo-issuer-client-auth={{ .Values.demoIssuer.clientAuth }}
             {{- end }}
-            {{- if or .Values.demoVerifier.trustAnchors .Values.demoVerifier.existingTrustAnchorsSecret }}
-            - --demo-verifier-trust-anchor=/opt/eudi-dev/trust-anchors/trust-anchors.pem
+            {{- if or .Values.demoVerifier.issuerCAs .Values.demoVerifier.existingIssuerCASecret }}
+            - --demo-verifier-issuer-ca=/opt/eudi-dev/demo-verifier-issuer-ca/ca.pem
             {{- end }}
             {{- if or .Values.imprint.html .Values.imprint.existingConfigMap }}
             - --imprint-file=/opt/eudi-dev/imprint/imprint.html
@@ -165,8 +168,8 @@ spec:
             {{- if or .Values.credentialTemplates.templates .Values.credentialTemplates.existingConfigMap }}
             - --templates-dir=/opt/eudi-dev/templates
             {{- end }}
-            {{- range include "eudi-dev.importCredentialPaths" . | splitList "\n" | compact }}
-            - --credential={{ . }}
+            {{- if include "eudi-dev.startupCredentials" . }}
+            - --credentials=/opt/eudi-dev/credentials
             {{- end }}
             {{- if .Values.extraArgs }}
             {{- include "common.tplvalues.render" (dict "value" .Values.extraArgs "context" $) | nindent 12 }}
@@ -268,9 +271,14 @@ spec:
               mountPath: /opt/eudi-dev/ca
               readOnly: true
             {{- end }}
-            {{- if or .Values.demoVerifier.trustAnchors .Values.demoVerifier.existingTrustAnchorsSecret }}
-            - name: trust-anchors
-              mountPath: /opt/eudi-dev/trust-anchors
+            {{- if or .Values.demoVerifier.issuerCAs .Values.demoVerifier.existingIssuerCASecret }}
+            - name: demo-verifier-issuer-ca
+              mountPath: /opt/eudi-dev/demo-verifier-issuer-ca
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.relyingPartyCAs .Values.existingRelyingPartyCASecret }}
+            - name: relying-party-ca
+              mountPath: /opt/eudi-dev/relying-party-ca
               readOnly: true
             {{- end }}
             {{- if or .Values.imprint.html .Values.imprint.existingConfigMap }}
@@ -293,8 +301,8 @@ spec:
               mountPath: /opt/eudi-dev/templates
               readOnly: true
             {{- end }}
-            {{- if include "eudi-dev.importCredentialPaths" . }}
-            - name: import-credentials
+            {{- if include "eudi-dev.startupCredentials" . }}
+            - name: credentials
               mountPath: /opt/eudi-dev/credentials
               readOnly: true
             {{- end }}
@@ -319,20 +327,35 @@ spec:
           secret:
             secretName: {{ tpl .Values.tls.existingCASecret . }}
         {{- end }}
-        {{- if .Values.demoVerifier.existingTrustAnchorsSecret }}
-        - name: trust-anchors
+        {{- if .Values.demoVerifier.existingIssuerCASecret }}
+        - name: demo-verifier-issuer-ca
           secret:
-            secretName: {{ tpl .Values.demoVerifier.existingTrustAnchorsSecret . }}
+            secretName: {{ tpl .Values.demoVerifier.existingIssuerCASecret . }}
             items:
-              - key: {{ .Values.demoVerifier.existingTrustAnchorsSecretKey }}
-                path: trust-anchors.pem
-        {{- else if .Values.demoVerifier.trustAnchors }}
-        - name: trust-anchors
+              - key: {{ .Values.demoVerifier.existingIssuerCASecretKey }}
+                path: ca.pem
+        {{- else if .Values.demoVerifier.issuerCAs }}
+        - name: demo-verifier-issuer-ca
           configMap:
             name: {{ include "eudi-dev.configMapName" . }}
             items:
-              - key: trust-anchors.pem
-                path: trust-anchors.pem
+              - key: demo-verifier-issuer-ca.pem
+                path: ca.pem
+        {{- end }}
+        {{- if .Values.existingRelyingPartyCASecret }}
+        - name: relying-party-ca
+          secret:
+            secretName: {{ tpl .Values.existingRelyingPartyCASecret . }}
+            items:
+              - key: {{ .Values.existingRelyingPartyCASecretKey }}
+                path: ca.pem
+        {{- else if .Values.relyingPartyCAs }}
+        - name: relying-party-ca
+          configMap:
+            name: {{ include "eudi-dev.configMapName" . }}
+            items:
+              - key: relying-party-ca.pem
+                path: ca.pem
         {{- end }}
         {{- if or .Values.imprint.html .Values.imprint.existingConfigMap }}
         - name: imprint
@@ -366,18 +389,26 @@ spec:
                 path: {{ include "eudi-dev.templateFileName" $name }}
               {{- end }}
         {{- end }}
-        {{- if .Values.importCredentials.existingConfigMap }}
-        - name: import-credentials
-          configMap:
-            name: {{ tpl .Values.importCredentials.existingConfigMap . }}
-        {{- else if .Values.importCredentials.credentials }}
-        - name: import-credentials
-          configMap:
-            name: {{ include "eudi-dev.configMapName" . }}
-            items:
-              {{- range $name, $credential := .Values.importCredentials.credentials }}
-              - key: credential-{{ $name }}
-                path: {{ $name }}
+        {{- if include "eudi-dev.startupCredentials" . }}
+        - name: credentials
+          projected:
+            sources:
+              {{- if .Values.credentials.existingConfigMap }}
+              - configMap:
+                  name: {{ tpl .Values.credentials.existingConfigMap . }}
+              {{- end }}
+              {{- if or (and .Values.credentials.items (not .Values.credentials.existingConfigMap)) (include "eudi-dev.pidCredentialsEnabled" .) }}
+              - configMap:
+                  name: {{ include "eudi-dev.configMapName" . }}
+                  items:
+                    {{- if and .Values.credentials.items (not .Values.credentials.existingConfigMap) }}
+                    - key: credentials.yaml
+                      path: credentials.yaml
+                    {{- end }}
+                    {{- if (include "eudi-dev.pidCredentialsEnabled" .) }}
+                    - key: pid-credentials.yaml
+                      path: pid-credentials.yaml
+                    {{- end }}
               {{- end }}
         {{- end }}
         {{- if .Values.extraVolumes }}

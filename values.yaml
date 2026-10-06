@@ -3,8 +3,7 @@
 
 ## @section Global parameters
 ## Global Docker image parameters
-## Please, note that this will override the image parameters, including dependencies, configured to use the global value
-## Current available global Docker image parameters: imageRegistry, imagePullSecrets and storageClass
+## The global values override the image parameters of this chart and its dependencies.
 
 ## @param global.imageRegistry Global Docker image registry
 ## @param global.imagePullSecrets Global Docker registry secret names as an array
@@ -58,7 +57,7 @@ commonAnnotations: {}
 ##
 clusterDomain: cluster.local
 ## @param extraDeploy Array of extra objects to deploy with the release (evaluated as a template)
-## Use it for resources this chart does not create, such as an Istio VirtualService.
+## Use it for resources this chart does not create, such as service mesh routes.
 ##
 extraDeploy: []
 ## Enable diagnostic mode in the deployment
@@ -83,14 +82,14 @@ diagnosticMode:
 ## @param image.registry eudi-dev image registry
 ## @param image.repository eudi-dev image repository
 ## @param image.tag eudi-dev image tag (immutable tags are recommended)
-## @param image.digest eudi-dev image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag
+## @param image.digest eudi-dev image digest such as sha256:aa..., which overrides the tag when set
 ## @param image.pullPolicy eudi-dev image pull policy
 ## @param image.pullSecrets eudi-dev image pull secrets
 ##
 image:
   registry: ghcr.io
   repository: dominikschlosser/eudi-dev
-  tag: v2.6.0
+  tag: v3.0.0
   digest: ""
   ## Specify a imagePullPolicy
   ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
@@ -104,7 +103,7 @@ image:
   ##   - myRegistryKeySecretName
   ##
   pullSecrets: []
-## @param baseURL Public URL of the wallet, such as https://eudi.example.com or https://example.com/some/context. Empty: the ingress URL when the ingress is enabled, otherwise the in-cluster service URL
+## @param baseURL Public URL of the wallet, such as https://eudi.example.com or https://example.com/some/context. If empty, the chart uses the ingress URL when the ingress is enabled, otherwise the in-cluster service URL. Required with `httpRoute.enabled`
 ## The wallet builds all URLs in credentials, metadata and requests from it.
 ## Use an https URL behind an ingress. With an http URL, the wallet serves its issuer on a separate port that the ingress does not route.
 ## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/reverse-proxy.md
@@ -113,9 +112,14 @@ baseURL: ""
 ## @param autoAccept Approve issuance and presentation requests without a consent prompt (`--auto-accept`)
 ##
 autoAccept: true
-## @param generatePID Generate the default PID credentials on start (`--pid`)
+## @param pidCredentials PID templates the wallet issues on every start, each as SD-JWT VC and mdoc (`<name>-sdjwt` and `<name>-mdoc`). They are startup credentials with the template name as id, so a restart replaces them. Empty: no PIDs
+## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/templates.md
 ##
-generatePID: true
+pidCredentials:
+  - pid
+  - german-pid
+  - italian-pid
+  - dutch-pid
 ## @param validationMode Validation mode: `debug` reports problems and continues, `strict` aborts the flow (`--mode`)
 ##
 validationMode: debug
@@ -185,6 +189,24 @@ outboundProxy:
 ## @param haip Enforce HAIP 1.0 on presentations and credential offers: `true`, `false`, or empty for the eudi-dev default (on with `demo.enabled`) (`--haip`)
 ##
 haip: ""
+## @param arf Check verifiers and issuers against the ARF (access and registration certificates, and the trusted lists of received credentials): `true`, `false`, or empty for the eudi-dev default (on with `demo.enabled`) (`--arf`)
+## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/presenting.md#arf-checks
+##
+arf: ""
+## @param relyingPartyCAs PEM CA certificates of other registrars. `arf` trusts them for access and registration certificates in addition to the wallet's own CAs (`--relying-party-ca`)
+## e.g:
+## relyingPartyCAs: |
+##   -----BEGIN CERTIFICATE-----
+##   ...
+##   -----END CERTIFICATE-----
+##
+relyingPartyCAs: ""
+## @param existingRelyingPartyCASecret Name of an existing secret with the PEM relying party CAs (`relyingPartyCAs` is then ignored)
+##
+existingRelyingPartyCASecret: ""
+## @param existingRelyingPartyCASecretKey Key of the PEM relying party CAs in `existingRelyingPartyCASecret`
+##
+existingRelyingPartyCASecretKey: ca.crt
 ## @param statusList Embed status list references in the credentials the wallet generates (`--status-list`)
 ##
 statusList: false
@@ -232,20 +254,20 @@ demoIssuer:
 ## The demo verifier
 ##
 demoVerifier:
-  ## @param demoVerifier.trustAnchors PEM CA certificates the demo verifier accepts issuer chains under, next to the wallet's own CA (`--demo-verifier-trust-anchor`)
+  ## @param demoVerifier.issuerCAs PEM CA certificates of credential issuers the demo verifier accepts, next to the wallet's own CA (`--demo-verifier-issuer-ca`)
   ## e.g:
-  ## trustAnchors: |
+  ## issuerCAs: |
   ##   -----BEGIN CERTIFICATE-----
   ##   ...
   ##   -----END CERTIFICATE-----
   ##
-  trustAnchors: ""
-  ## @param demoVerifier.existingTrustAnchorsSecret Name of an existing secret with the PEM trust anchors (`demoVerifier.trustAnchors` is then ignored)
+  issuerCAs: ""
+  ## @param demoVerifier.existingIssuerCASecret Name of an existing secret with the PEM issuer CAs (`demoVerifier.issuerCAs` is then ignored)
   ##
-  existingTrustAnchorsSecret: ""
-  ## @param demoVerifier.existingTrustAnchorsSecretKey Key of the PEM trust anchors in `demoVerifier.existingTrustAnchorsSecret`
+  existingIssuerCASecret: ""
+  ## @param demoVerifier.existingIssuerCASecretKey Key of the PEM issuer CAs in `demoVerifier.existingIssuerCASecret`
   ##
-  existingTrustAnchorsSecretKey: ca.crt
+  existingIssuerCASecretKey: ca.crt
 ## Legal notice of the site operator, served at /imprint. Public hosting in the EU requires one.
 ## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/public-demo.md
 ##
@@ -294,21 +316,26 @@ credentialTemplates:
   ## @param credentialTemplates.existingConfigMap Name of an existing ConfigMap with one template per key, such as `employee-card.json` (`credentialTemplates.templates` is then ignored)
   ##
   existingConfigMap: ""
-## Credentials to import on every start. With file or postgresql storage each start adds another copy.
+## Credentials the wallet adds on every start (`--credentials`). An entry issues a credential
+## from a template with overrides, or imports a finished credential. A restart replaces each
+## entry under its id, so the wallet holds one copy of each.
+## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials
 ##
-importCredentials:
-  ## @param importCredentials.credentials Credentials by file name, as SD-JWT, JWT or mdoc (`--credential`)
+credentials:
+  ## @param credentials.items [array] Entries with an `id` and either a `template` (with optional `claims`, `always_disclosed`, `omit`, `exp` and `display`) or a finished `credential`, and optionally `protected`
   ## e.g:
-  ## credentials:
-  ##   employee.sdjwt: eyJhbGciOi...~
+  ## items:
+  ##   - id: employee-alice
+  ##     template: employee-card
+  ##     claims:
+  ##       employee_id: E-2
+  ##   - id: partner-ticket
+  ##     credential: eyJhbGciOi...~
   ##
-  credentials: {}
-  ## @param importCredentials.existingConfigMap Name of an existing ConfigMap with the credentials (`importCredentials.credentials` is then ignored)
+  items: []
+  ## @param credentials.existingConfigMap Name of an existing ConfigMap with YAML or JSON credentials files, mounted as a directory (`credentials.items` is then ignored)
   ##
   existingConfigMap: ""
-  ## @param importCredentials.existingConfigMapKeys Keys of the credentials to import from `importCredentials.existingConfigMap`
-  ##
-  existingConfigMapKeys: []
 ## @param extraArgs Extra arguments for `eudi wallet serve`
 ## e.g:
 ## extraArgs:
@@ -432,7 +459,7 @@ resources: {}
 ##
 podSecurityContext:
   enabled: true
-  fsGroupChangePolicy: Always
+  fsGroupChangePolicy: OnRootMismatch
   sysctls: []
   supplementalGroups: []
   fsGroup: 1000
@@ -517,7 +544,7 @@ nodeSelector: {}
 tolerations: []
 ## @param updateStrategy.type eudi-dev deployment strategy type
 ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
-## Recreate keeps two pods from using the same volume or wallet state at once.
+## Recreate keeps two pods from using the same volume or wallet state at once. It stops every replica before starting the new ones, so an update has a short downtime.
 ##
 updateStrategy:
   type: Recreate
@@ -648,8 +675,10 @@ networkPolicy:
   ## (with the correct destination port).
   ##
   allowExternal: true
-  ## @param networkPolicy.allowExternalEgress Allow the pod to access any range of port and all destinations.
-  ## The wallet fetches issuer metadata, request objects and status lists from anywhere.
+  ## @param networkPolicy.allowExternalEgress Allow egress to every destination and port. With `false` the pod can only reach DNS, the database, the proxy ports and `extraEgress`
+  ## With `false` and no proxy, the wallet can't fetch issuer metadata, request objects or status
+  ## lists from outside the cluster, and can't reach its own demo issuer and verifier through a
+  ## public ingress URL.
   ##
   allowExternalEgress: true
   ## @param networkPolicy.extraIngress [array] Add extra ingress rules to the NetworkPolicy
@@ -799,7 +828,7 @@ httpRoute:
   ## @param httpRoute.labels Additional labels for the HTTPRoute resource
   ##
   labels: {}
-  ## @param httpRoute.parentRefs Gateways the HTTPRoute is attached to. If unspecified, it'll be attached to Gateway named 'gateway' in the same namespace.
+  ## @param httpRoute.parentRefs Gateways the HTTPRoute is attached to (required with `httpRoute.enabled`)
   ## e.g:
   ## parentRefs:
   ##   - name: my-gateway

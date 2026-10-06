@@ -1,11 +1,42 @@
 annotations:
-  images: |
+  artifacthub.io/category: security
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/images: |
     - name: eudi-dev
-      version: 2.6.0
-      image: ghcr.io/dominikschlosser/eudi-dev:v2.6.0
-  licenses: Apache-2.0
+      image: ghcr.io/dominikschlosser/eudi-dev:v3.0.0
+  artifacthub.io/links: |
+    - name: eudi-dev documentation
+      url: https://github.com/dominikschlosser/eudi-dev/tree/main/docs
+    - name: Chart source
+      url: https://github.com/dominikschlosser/eudi-dev-helm
+    - name: Chart issues
+      url: https://github.com/dominikschlosser/eudi-dev-helm/issues
+  artifacthub.io/changes: |
+    - kind: added
+      description: arf turns on the ARF checks of verifiers and issuers, and relyingPartyCAs adds the CAs of other registrars
+    - kind: added
+      description: "Artifact Hub metadata: links, license, category, images and changes"
+    - kind: added
+      description: The service ports carry appProtocol, so a service mesh detects HTTP and TLS
+    - kind: changed
+      description: Deploys eudi-dev 3.0.0
+    - kind: changed
+      description: credentials replaces importCredentials and issues or imports credentials on every start
+    - kind: changed
+      description: pidCredentials replaces generatePID, and the wallet holds the EUDI, German, Italian and Dutch PIDs by default
+    - kind: changed
+      description: The chart fails when httpRoute.enabled is set without baseURL or httpRoute.parentRefs
+    - kind: changed
+      description: The chart fails when neither baseURL nor the ingress is set and the service ports differ from the container ports
+    - kind: changed
+      description: podSecurityContext.fsGroupChangePolicy defaults to OnRootMismatch
+    - kind: changed
+      description: demoVerifier.issuerCAs and demoVerifier.existingIssuerCASecret replace demoVerifier.trustAnchors and demoVerifier.existingTrustAnchorsSecret
+    - kind: changed
+      description: The chart fails on the renamed values
 apiVersion: v2
-appVersion: 2.6.0
+appVersion: 3.0.0
 dependencies:
   - name: common
     repository: oci://registry-1.docker.io/bitnamicharts
@@ -30,4 +61,4 @@ name: eudi-dev
 sources:
   - https://github.com/dominikschlosser/eudi-dev
   - https://github.com/dominikschlosser/eudi-dev-helm
-version: 0.2.0
+version: 1.0.0

@@ -146,7 +146,7 @@ config=$(curl -fs http://localhost:18200/api/config)
 expect "storage" "$(json storage <<<"$config")" memory
 expect "base URL" "$(json base_url <<<"$config")" http://default-eudi-dev.t-default.svc.cluster.local:8085
 expect "issuer URL" "$(json issuer_url <<<"$config")" https://default-eudi-dev.t-default.svc.cluster.local:8086
-expect "PID credentials" "$(credential_count 18200)" 2
+expect "PID credentials" "$(credential_count 18200)" 8
 issuer=$(in_cluster 'curl -fsk https://default-eudi-dev.t-default.svc.cluster.local:8086/.well-known/jwt-vc-issuer')
 expect "issuer metadata over the issuer port" "$(json issuer <<<"$issuer")" https://default-eudi-dev.t-default.svc.cluster.local:8086
 
@@ -231,7 +231,7 @@ expect "demo issuer identifier" "$(json credential_issuer <<<"$metadata")" https
 location=$(curl -s -o /dev/null -D - -H 'Host: example.com' http://localhost:18206/some/context/decoder | tr -d '\r' | awk -F': ' 'tolower($1) == "location" {print $2}')
 expect "redirect stays under the prefix" "$location" /some/context/decoder/
 
-log "Wallet options: flags, keys, templates, imprint and imported credentials"
+log "Wallet options: flags, keys, templates, imprint and startup credentials"
 kubectl create namespace t-options >/dev/null
 workdir=$(mktemp -d)
 for key in holder issuer; do
@@ -239,14 +239,23 @@ for key in holder issuer; do
   kubectl -n t-options create secret generic "e2e-$key-key" --from-file=key.pem="$workdir/$key.pem" >/dev/null
 done
 # A credential and a CA from the default wallet, so the demo verifier trusts a foreign issuer.
-curl -fs "http://localhost:18200/api/credentials/$(issue 18200)" | json raw >"$workdir/employee.sdjwt"
-kubectl -n t-options create configmap e2e-credentials --from-file=employee.sdjwt="$workdir/employee.sdjwt" >/dev/null
+# The startup credentials import that credential and issue one from the chart's template.
+{
+  echo "credentials:"
+  echo "  - id: imported-employee"
+  echo "    credential: $(curl -fs "http://localhost:18200/api/credentials/$(issue 18200)" | json raw)"
+  echo "  - id: issued-employee"
+  echo "    template: employee-card"
+  echo "    claims: {employee_id: E-2}"
+} >"$workdir/credentials.yaml"
+kubectl -n t-options create configmap e2e-credentials --from-file=credentials.yaml="$workdir/credentials.yaml" >/dev/null
 curl -fs http://localhost:18200/api/certificates/ca >"$workdir/ca.pem"
-install options -f "$CHART/ci/options-values.yaml" --set-file "demoVerifier.trustAnchors=$workdir/ca.pem"
+install options -f "$CHART/ci/options-values.yaml" --set-file "demoVerifier.issuerCAs=$workdir/ca.pem" --set-file "relyingPartyCAs=$workdir/ca.pem"
 rm -rf "$workdir"
 forward t-options svc/options-eudi-dev 18208
 config=$(curl -fs http://localhost:18208/api/config)
 expect "HAIP" "$(json require_haip <<<"$config")" True
+expect "ARF" "$(json require_arf <<<"$config")" True
 expect "VCI version" "$(json vci_version <<<"$config")" 1.1
 expect "session transcript" "$(json session_transcript <<<"$config")" iso
 expect "preferred format" "$(json preferred_format <<<"$config")" mso_mdoc
@@ -255,7 +264,9 @@ expect "encrypted requests required" "$(json require_encrypted_request <<<"$conf
 expect "client attestation" "$(json force_client_attestation <<<"$config")" True
 expect "ad hoc display images" "$(json adhoc_display_images <<<"$config")" True
 expect "status list" "$([ -n "$(json status_list_url <<<"$config")" ] && echo set)" set
-expect "PID and imported credentials" "$(credential_count 18208)" 3
+expect "PID and startup credentials" "$(credential_count 18208)" 10
+expect "imported credential by its id" "$(curl -fs -o /dev/null -w '%{http_code}' http://localhost:18208/api/credentials/imported-employee)" 200
+expect "credential issued from the template" "$(curl -fs http://localhost:18208/api/credentials/issued-employee | json vct)" urn:example:employee
 expect "credential template" "$(curl -fs http://localhost:18208/api/templates/employee-card | json vct)" urn:example:employee
 expect "imprint" "$(curl -fs http://localhost:18208/imprint | grep -c 'E2E operator')" 1
 

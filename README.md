@@ -25,7 +25,7 @@ helm install my-release oci://ghcr.io/dominikschlosser/charts/eudi-dev
 
 ## Introduction
 
-This chart deploys eudi-dev on a [Kubernetes](https://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager. It follows the conventions of the [Bitnami charts](https://github.com/bitnami/charts) and uses their [common library chart](https://github.com/bitnami/charts/tree/main/bitnami/common).
+This chart deploys eudi-dev on a [Kubernetes](https://kubernetes.io) cluster using the [Helm](https://helm.sh) package manager. eudi-dev is a development and test tool. Do not use it with real credentials or real identity data. The wallet API has no authentication. Anyone with access to it can issue and delete credentials and register and delete relying parties. The chart follows the conventions of the [Bitnami charts](https://github.com/bitnami/charts) and uses their [common library chart](https://github.com/bitnami/charts/tree/main/bitnami/common).
 
 ## Prerequisites
 
@@ -102,12 +102,13 @@ Each setting maps to a `wallet serve` flag. The [Parameters](#parameters) sectio
 | Values | Controls |
 |--------|----------|
 | `haip` | HAIP 1.0 on presentations and credential offers |
+| `arf`, `relyingPartyCAs` | ARF checks of verifiers and issuers, and the CAs of other registrars |
 | `issuance.*` | OpenID4VCI: feature level, client ID and redirect URI, wallet and key attestation |
 | `presentation.*` | OpenID4VP: mdoc session transcript, preferred format, encrypted request objects |
 | `demoIssuer.clientAuth`, `demoVerifier.*` | The demo issuer's client authentication and the CAs the demo verifier trusts |
 | `statusList`, `adhocDisplayImages` | Status list references in generated credentials, display images loaded on demand |
 
-Empty values leave the flag out and keep the eudi-dev default. With `demo.enabled=true` the defaults are those of the demo profile, such as HAIP and OpenID4VCI 1.1.
+Empty values leave the flag out and keep the eudi-dev default. With `demo.enabled=true` the defaults are those of the demo profile, such as HAIP, the ARF checks and OpenID4VCI 1.1.
 
 ### Public demo and imprint
 
@@ -122,7 +123,11 @@ imprint:
     <p>Example GmbH, Example Street 1, 12345 Example City</p>
 ```
 
-### Credential templates and imported credentials
+### PID credentials
+
+By default the wallet holds every predefined PID: the EUDI PID and the German, Italian and Dutch PIDs, each as SD-JWT VC and mdoc. `pidCredentials` lists the PID templates by name. The wallet issues them as [startup credentials](https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials) under the template names, so a restart replaces them. Set it to `[]` for a wallet without PIDs, or to `[pid]` for the EUDI PID only. With `demo.enabled` the value has no effect, because the demo profile brings its own PIDs.
+
+### Credential templates and startup credentials
 
 `credentialTemplates.templates` defines [credential templates](https://github.com/dominikschlosser/eudi-dev/blob/main/docs/templates.md) by name. They replace the templates in the storage backend, so saving or deleting a template in the web UI fails while they are set.
 
@@ -136,7 +141,22 @@ credentialTemplates:
         employee_id: E-1
 ```
 
-`importCredentials.credentials` imports credentials (SD-JWT, JWT or mdoc) by file name when the wallet starts, or `importCredentials.existingConfigMap` with the keys in `importCredentials.existingConfigMapKeys`. The wallet imports them on every start, so with `file` or `postgresql` storage each restart, and each replica, adds another copy. A credential bound to a holder key needs that key in `holderKey.existingSecret`.
+`credentials.items` lists [credentials the wallet adds on every start](https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials). An entry issues a credential from a template and sets only what differs from the template's defaults, or it imports a finished credential. A restart replaces each entry under its `id`, so the wallet holds one copy of each. With `demo.enabled` the entries are protected and a demo reset restores them. An entry with `protected: false` can be deleted until the next reset. `credentials.existingConfigMap` mounts a ConfigMap with YAML or JSON files of such entries instead.
+
+```yaml
+credentials:
+  items:
+    - id: employee-alice
+      template: employee-card
+      claims:
+        employee_id: E-2
+    - id: erika
+      template: german-pid-sdjwt
+    - id: partner-ticket
+      credential: eyJhbGciOi...~
+```
+
+An imported credential bound to a holder key needs that key in `holderKey.existingSecret`.
 
 ### Path prefix
 
@@ -154,33 +174,7 @@ The specs put issuer metadata at the root of the host, such as `/.well-known/ope
 
 ### Ingress and Gateway API
 
-Set `ingress.enabled=true` to create an Ingress, or `httpRoute.enabled=true` to create a Gateway API HTTPRoute. For TLS, use cert-manager annotations (`ingress.annotations`), your own certificates (`ingress.secrets`) or a self-signed certificate (`ingress.selfSigned=true`).
-
-### Istio and other resources
-
-The chart does not create resources for service meshes. Add them with `extraDeploy`, as with Bitnami charts. This Istio VirtualService serves the wallet under `/some/context` and also routes the issuer metadata paths at the host root:
-
-```yaml
-baseURL: https://example.com/some/context
-extraDeploy:
-  - apiVersion: networking.istio.io/v1
-    kind: VirtualService
-    metadata:
-      name: '{{ include "common.names.fullname" . }}'
-    spec:
-      hosts: [example.com]
-      gateways: [istio-system/public-gateway]
-      http:
-        - match:
-            - uri: { prefix: /.well-known/openid-credential-issuer/some/context }
-            - uri: { prefix: /.well-known/oauth-authorization-server/some/context }
-            - uri: { prefix: /.well-known/jwt-vc-issuer/some/context }
-            - uri: { prefix: /some/context }
-          route:
-            - destination:
-                host: '{{ include "common.names.fullname" . }}'
-                port: { number: 8085 }
-```
+Set `ingress.enabled=true` to create an Ingress, or `httpRoute.enabled=true` to create a Gateway API HTTPRoute. The HTTPRoute needs `baseURL` and `httpRoute.parentRefs`. For TLS, use cert-manager annotations (`ingress.annotations`), your own certificates (`ingress.secrets`) or a self-signed certificate (`ingress.selfSigned=true`).
 
 ### Outbound proxy and certificates
 
@@ -212,13 +206,11 @@ Use `extraEnvVars`, `extraEnvVarsCM` or `extraEnvVarsSecret` for environment var
 
 ### Sidecars and Init Containers
 
-If you need additional containers to run within the same pod (e.g. an additional metrics or logging exporter), you can do so via the `sidecars` config parameter. Similarly, you can add extra init containers using the `initContainers` parameter.
+`sidecars` adds containers to the pod, such as a metrics or logging exporter. `initContainers` adds init containers.
 
 ### Pod affinity
 
-This chart allows you to set your custom affinity using the `affinity` parameter. Find more information about Pod's affinity in the [kubernetes documentation](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity).
-
-As an alternative, you can use the preset configurations for pod affinity, pod anti-affinity, and node affinity available at the [bitnami/common](https://github.com/bitnami/charts/tree/main/bitnami/common#affinities) chart. To do so, set the `podAffinityPreset`, `podAntiAffinityPreset`, or `nodeAffinityPreset` parameters.
+`affinity` sets a custom affinity (see the [Kubernetes documentation](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)). `podAffinityPreset`, `podAntiAffinityPreset` and `nodeAffinityPreset` apply the presets of the [bitnami/common](https://github.com/bitnami/charts/tree/main/bitnami/common#affinities) chart instead.
 
 ### Resource requests and limits
 
@@ -254,64 +246,67 @@ The chart sets requests and limits from `resourcesPreset` (`micro` by default). 
 
 ### eudi-dev parameters
 
-| Name                                         | Description                                                                                                                                                                                                                              | Value                       |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `image.registry`                             | eudi-dev image registry                                                                                                                                                                                                                  | `ghcr.io`                   |
-| `image.repository`                           | eudi-dev image repository                                                                                                                                                                                                                | `dominikschlosser/eudi-dev` |
-| `image.tag`                                  | eudi-dev image tag (immutable tags are recommended)                                                                                                                                                                                      | `v2.6.0`                    |
-| `image.digest`                               | eudi-dev image digest in the way sha256:aa.... Please note this parameter, if set, will override the tag                                                                                                                                 | `""`                        |
-| `image.pullPolicy`                           | eudi-dev image pull policy                                                                                                                                                                                                               | `IfNotPresent`              |
-| `image.pullSecrets`                          | eudi-dev image pull secrets                                                                                                                                                                                                              | `[]`                        |
-| `baseURL`                                    | Public URL of the wallet, such as https://eudi.example.com or https://example.com/some/context. Empty: the ingress URL when the ingress is enabled, otherwise the in-cluster service URL                                                 | `""`                        |
-| `autoAccept`                                 | Approve issuance and presentation requests without a consent prompt (`--auto-accept`)                                                                                                                                                    | `true`                      |
-| `generatePID`                                | Generate the default PID credentials on start (`--pid`)                                                                                                                                                                                  | `true`                      |
-| `validationMode`                             | Validation mode: `debug` reports problems and continues, `strict` aborts the flow (`--mode`)                                                                                                                                             | `debug`                     |
-| `demo.enabled`                               | Run the hardened public demo profile (`--demo`)                                                                                                                                                                                          | `false`                     |
-| `demo.reset`                                 | Schedule for resetting the demo to its initial state, such as `1h` or `00:00 Europe/Berlin` (`--demo-reset`). Empty: the eudi-dev default                                                                                                | `""`                        |
-| `storage.type`                               | Storage backend: `memory` (lost on restart), `file` (on the volume, see `persistence`) or `postgresql` (see `externalDatabase`)                                                                                                          | `memory`                    |
-| `seed.value`                                 | Seed for deriving the wallet's keys. `auto` uses the public seed `eudi-dev` with memory storage and random keys otherwise. Empty: random keys                                                                                            | `auto`                      |
-| `seed.existingSecret`                        | Name of an existing secret with the seed (`seed.value` is then ignored)                                                                                                                                                                  | `""`                        |
-| `seed.existingSecretKey`                     | Key of the seed in `seed.existingSecret`                                                                                                                                                                                                 | `seed`                      |
-| `logFormat`                                  | Console output format: `text`, or `json` for one JSON record per line with a level and the logging component (`EUDI_DEV_LOG_FORMAT`)                                                                                                     | `text`                      |
-| `tls.verify`                                 | Verify issuer and verifier certificates: `true`, `false`, or empty for the validation mode default (`--tls-verify`)                                                                                                                      | `""`                        |
-| `tls.existingCASecret`                       | Name of an existing secret with PEM CA certificates to trust in addition to the system ones (`--tls-ca`)                                                                                                                                 | `""`                        |
-| `tls.existingCASecretKey`                    | Key of the CA bundle in `tls.existingCASecret`                                                                                                                                                                                           | `ca.crt`                    |
-| `outboundProxy.httpsProxy`                   | Proxy for `https://` URLs (`HTTPS_PROXY`)                                                                                                                                                                                                | `""`                        |
-| `outboundProxy.httpProxy`                    | Proxy for `http://` URLs (`HTTP_PROXY`)                                                                                                                                                                                                  | `""`                        |
-| `outboundProxy.noProxy`                      | Comma separated hosts to connect to directly, in addition to the in-cluster services (`NO_PROXY`)                                                                                                                                        | `""`                        |
-| `haip`                                       | Enforce HAIP 1.0 on presentations and credential offers: `true`, `false`, or empty for the eudi-dev default (on with `demo.enabled`) (`--haip`)                                                                                          | `""`                        |
-| `statusList`                                 | Embed status list references in the credentials the wallet generates (`--status-list`)                                                                                                                                                   | `false`                     |
-| `adhocDisplayImages`                         | Keep an issuer's https display image URLs and load them when a card is shown instead of storing the images (`--adhoc-display-images`)                                                                                                    | `false`                     |
-| `issuance.vciVersion`                        | OpenID4VCI feature level: `1.0`, `1.1`, or empty for the eudi-dev default (`1.0`, `1.1` with `demo.enabled`) (`--vci-version`)                                                                                                           | `""`                        |
-| `issuance.clientId`                          | Client ID for authorization code flows (`--vci-client-id`)                                                                                                                                                                               | `""`                        |
-| `issuance.redirectURI`                       | Redirect URI for authorization code flows (`--vci-redirect-uri`)                                                                                                                                                                         | `""`                        |
-| `issuance.clientAttestation`                 | Send the wallet attestation on token requests even when the issuer does not advertise `attest_jwt_client_auth` (`--client-attestation`)                                                                                                  | `false`                     |
-| `issuance.keyAttestationLevel`               | What the key attestation claims as key storage and user authentication: `none`, `iso_18045_high`, `iso_18045_moderate`, `iso_18045_enhanced-basic`, `iso_18045_basic`, or empty for what the issuer requires (`--key-attestation-level`) | `""`                        |
-| `presentation.sessionTranscript`             | mdoc session transcript: `oid4vp` (OpenID4VP 1.0), `iso` (ISO 18013-7), or empty for the eudi-dev default (`oid4vp`) (`--session-transcript`)                                                                                            | `""`                        |
-| `presentation.preferredFormat`               | Format to present when credentials in several formats match: `dc+sd-jwt`, `mso_mdoc`, `jwt_vc_json`, or empty for no preference (`--preferred-format`)                                                                                   | `""`                        |
-| `presentation.requireEncryptedRequest`       | Reject request objects that are not encrypted (`--require-encrypted-request`)                                                                                                                                                            | `false`                     |
-| `demoIssuer.clientAuth`                      | What the demo issuer requires at its PAR and token endpoints: `required` (wallet attestation, HAIP 1.0), `optional`, or empty for the eudi-dev default (`required`) (`--demo-issuer-client-auth`)                                        | `""`                        |
-| `demoVerifier.trustAnchors`                  | PEM CA certificates the demo verifier accepts issuer chains under, next to the wallet's own CA (`--demo-verifier-trust-anchor`)                                                                                                          | `""`                        |
-| `demoVerifier.existingTrustAnchorsSecret`    | Name of an existing secret with the PEM trust anchors (`demoVerifier.trustAnchors` is then ignored)                                                                                                                                      | `""`                        |
-| `demoVerifier.existingTrustAnchorsSecretKey` | Key of the PEM trust anchors in `demoVerifier.existingTrustAnchorsSecret`                                                                                                                                                                | `ca.crt`                    |
-| `imprint.html`                               | HTML snippet with the legal notice (`--imprint-file`)                                                                                                                                                                                    | `""`                        |
-| `imprint.existingConfigMap`                  | Name of an existing ConfigMap with the HTML snippet (`imprint.html` is then ignored)                                                                                                                                                     | `""`                        |
-| `imprint.existingConfigMapKey`               | Key of the HTML snippet in `imprint.existingConfigMap`                                                                                                                                                                                   | `imprint.html`              |
-| `holderKey.existingSecret`                   | Name of an existing secret with the holder's EC private key as PEM or JWK (`--key`)                                                                                                                                                      | `""`                        |
-| `holderKey.existingSecretKey`                | Key of the holder key in `holderKey.existingSecret`                                                                                                                                                                                      | `key.pem`                   |
-| `issuerKey.existingSecret`                   | Name of an existing secret with the issuer's EC private key as PEM or JWK (`--issuer-key`)                                                                                                                                               | `""`                        |
-| `issuerKey.existingSecretKey`                | Key of the issuer key in `issuerKey.existingSecret`                                                                                                                                                                                      | `key.pem`                   |
-| `credentialTemplates.templates`              | Templates by name (`--templates-dir`)                                                                                                                                                                                                    | `{}`                        |
-| `credentialTemplates.existingConfigMap`      | Name of an existing ConfigMap with one template per key, such as `employee-card.json` (`credentialTemplates.templates` is then ignored)                                                                                                  | `""`                        |
-| `importCredentials.credentials`              | Credentials by file name, as SD-JWT, JWT or mdoc (`--credential`)                                                                                                                                                                        | `{}`                        |
-| `importCredentials.existingConfigMap`        | Name of an existing ConfigMap with the credentials (`importCredentials.credentials` is then ignored)                                                                                                                                     | `""`                        |
-| `importCredentials.existingConfigMapKeys`    | Keys of the credentials to import from `importCredentials.existingConfigMap`                                                                                                                                                             | `[]`                        |
-| `extraArgs`                                  | Extra arguments for `eudi wallet serve`                                                                                                                                                                                                  | `[]`                        |
-| `command`                                    | Override the default container command (useful when using custom images)                                                                                                                                                                 | `[]`                        |
-| `args`                                       | Override the default container args (useful when using custom images)                                                                                                                                                                    | `[]`                        |
-| `extraEnvVars`                               | Array with extra environment variables to add to the eudi-dev container                                                                                                                                                                  | `[]`                        |
-| `extraEnvVarsCM`                             | Name of existing ConfigMap containing extra env vars for the eudi-dev container                                                                                                                                                          | `""`                        |
-| `extraEnvVarsSecret`                         | Name of existing Secret containing extra env vars for the eudi-dev container                                                                                                                                                             | `""`                        |
+| Name                                     | Description                                                                                                                                                                                                                                   | Value                                            |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `image.registry`                         | eudi-dev image registry                                                                                                                                                                                                                       | `ghcr.io`                                        |
+| `image.repository`                       | eudi-dev image repository                                                                                                                                                                                                                     | `dominikschlosser/eudi-dev`                      |
+| `image.tag`                              | eudi-dev image tag (immutable tags are recommended)                                                                                                                                                                                           | `v3.0.0`                                         |
+| `image.digest`                           | eudi-dev image digest such as sha256:aa..., which overrides the tag when set                                                                                                                                                                  | `""`                                             |
+| `image.pullPolicy`                       | eudi-dev image pull policy                                                                                                                                                                                                                    | `IfNotPresent`                                   |
+| `image.pullSecrets`                      | eudi-dev image pull secrets                                                                                                                                                                                                                   | `[]`                                             |
+| `baseURL`                                | Public URL of the wallet, such as https://eudi.example.com or https://example.com/some/context. If empty, the chart uses the ingress URL when the ingress is enabled, otherwise the in-cluster service URL. Required with `httpRoute.enabled` | `""`                                             |
+| `autoAccept`                             | Approve issuance and presentation requests without a consent prompt (`--auto-accept`)                                                                                                                                                         | `true`                                           |
+| `pidCredentials`                         | PID templates the wallet issues on every start, each as SD-JWT VC and mdoc (`<name>-sdjwt` and `<name>-mdoc`). They are startup credentials with the template name as id, so a restart replaces them. Empty: no PIDs                          | `["pid","german-pid","italian-pid","dutch-pid"]` |
+| `validationMode`                         | Validation mode: `debug` reports problems and continues, `strict` aborts the flow (`--mode`)                                                                                                                                                  | `debug`                                          |
+| `demo.enabled`                           | Run the hardened public demo profile (`--demo`)                                                                                                                                                                                               | `false`                                          |
+| `demo.reset`                             | Schedule for resetting the demo to its initial state, such as `1h` or `00:00 Europe/Berlin` (`--demo-reset`). Empty: the eudi-dev default                                                                                                     | `""`                                             |
+| `storage.type`                           | Storage backend: `memory` (lost on restart), `file` (on the volume, see `persistence`) or `postgresql` (see `externalDatabase`)                                                                                                               | `memory`                                         |
+| `seed.value`                             | Seed for deriving the wallet's keys. `auto` uses the public seed `eudi-dev` with memory storage and random keys otherwise. Empty: random keys                                                                                                 | `auto`                                           |
+| `seed.existingSecret`                    | Name of an existing secret with the seed (`seed.value` is then ignored)                                                                                                                                                                       | `""`                                             |
+| `seed.existingSecretKey`                 | Key of the seed in `seed.existingSecret`                                                                                                                                                                                                      | `seed`                                           |
+| `logFormat`                              | Console output format: `text`, or `json` for one JSON record per line with a level and the logging component (`EUDI_DEV_LOG_FORMAT`)                                                                                                          | `text`                                           |
+| `tls.verify`                             | Verify issuer and verifier certificates: `true`, `false`, or empty for the validation mode default (`--tls-verify`)                                                                                                                           | `""`                                             |
+| `tls.existingCASecret`                   | Name of an existing secret with PEM CA certificates to trust in addition to the system ones (`--tls-ca`)                                                                                                                                      | `""`                                             |
+| `tls.existingCASecretKey`                | Key of the CA bundle in `tls.existingCASecret`                                                                                                                                                                                                | `ca.crt`                                         |
+| `outboundProxy.httpsProxy`               | Proxy for `https://` URLs (`HTTPS_PROXY`)                                                                                                                                                                                                     | `""`                                             |
+| `outboundProxy.httpProxy`                | Proxy for `http://` URLs (`HTTP_PROXY`)                                                                                                                                                                                                       | `""`                                             |
+| `outboundProxy.noProxy`                  | Comma separated hosts to connect to directly, in addition to the in-cluster services (`NO_PROXY`)                                                                                                                                             | `""`                                             |
+| `haip`                                   | Enforce HAIP 1.0 on presentations and credential offers: `true`, `false`, or empty for the eudi-dev default (on with `demo.enabled`) (`--haip`)                                                                                               | `""`                                             |
+| `arf`                                    | Check verifiers and issuers against the ARF (access and registration certificates, and the trusted lists of received credentials): `true`, `false`, or empty for the eudi-dev default (on with `demo.enabled`) (`--arf`)                      | `""`                                             |
+| `relyingPartyCAs`                        | PEM CA certificates of other registrars. `arf` trusts them for access and registration certificates in addition to the wallet's own CAs (`--relying-party-ca`)                                                                                | `""`                                             |
+| `existingRelyingPartyCASecret`           | Name of an existing secret with the PEM relying party CAs (`relyingPartyCAs` is then ignored)                                                                                                                                                 | `""`                                             |
+| `existingRelyingPartyCASecretKey`        | Key of the PEM relying party CAs in `existingRelyingPartyCASecret`                                                                                                                                                                            | `ca.crt`                                         |
+| `statusList`                             | Embed status list references in the credentials the wallet generates (`--status-list`)                                                                                                                                                        | `false`                                          |
+| `adhocDisplayImages`                     | Keep an issuer's https display image URLs and load them when a card is shown instead of storing the images (`--adhoc-display-images`)                                                                                                         | `false`                                          |
+| `issuance.vciVersion`                    | OpenID4VCI feature level: `1.0`, `1.1`, or empty for the eudi-dev default (`1.0`, `1.1` with `demo.enabled`) (`--vci-version`)                                                                                                                | `""`                                             |
+| `issuance.clientId`                      | Client ID for authorization code flows (`--vci-client-id`)                                                                                                                                                                                    | `""`                                             |
+| `issuance.redirectURI`                   | Redirect URI for authorization code flows (`--vci-redirect-uri`)                                                                                                                                                                              | `""`                                             |
+| `issuance.clientAttestation`             | Send the wallet attestation on token requests even when the issuer does not advertise `attest_jwt_client_auth` (`--client-attestation`)                                                                                                       | `false`                                          |
+| `issuance.keyAttestationLevel`           | What the key attestation claims as key storage and user authentication: `none`, `iso_18045_high`, `iso_18045_moderate`, `iso_18045_enhanced-basic`, `iso_18045_basic`, or empty for what the issuer requires (`--key-attestation-level`)      | `""`                                             |
+| `presentation.sessionTranscript`         | mdoc session transcript: `oid4vp` (OpenID4VP 1.0), `iso` (ISO 18013-7), or empty for the eudi-dev default (`oid4vp`) (`--session-transcript`)                                                                                                 | `""`                                             |
+| `presentation.preferredFormat`           | Format to present when credentials in several formats match: `dc+sd-jwt`, `mso_mdoc`, `jwt_vc_json`, or empty for no preference (`--preferred-format`)                                                                                        | `""`                                             |
+| `presentation.requireEncryptedRequest`   | Reject request objects that are not encrypted (`--require-encrypted-request`)                                                                                                                                                                 | `false`                                          |
+| `demoIssuer.clientAuth`                  | What the demo issuer requires at its PAR and token endpoints: `required` (wallet attestation, HAIP 1.0), `optional`, or empty for the eudi-dev default (`required`) (`--demo-issuer-client-auth`)                                             | `""`                                             |
+| `demoVerifier.issuerCAs`                 | PEM CA certificates of credential issuers the demo verifier accepts, next to the wallet's own CA (`--demo-verifier-issuer-ca`)                                                                                                                | `""`                                             |
+| `demoVerifier.existingIssuerCASecret`    | Name of an existing secret with the PEM issuer CAs (`demoVerifier.issuerCAs` is then ignored)                                                                                                                                                 | `""`                                             |
+| `demoVerifier.existingIssuerCASecretKey` | Key of the PEM issuer CAs in `demoVerifier.existingIssuerCASecret`                                                                                                                                                                            | `ca.crt`                                         |
+| `imprint.html`                           | HTML snippet with the legal notice (`--imprint-file`)                                                                                                                                                                                         | `""`                                             |
+| `imprint.existingConfigMap`              | Name of an existing ConfigMap with the HTML snippet (`imprint.html` is then ignored)                                                                                                                                                          | `""`                                             |
+| `imprint.existingConfigMapKey`           | Key of the HTML snippet in `imprint.existingConfigMap`                                                                                                                                                                                        | `imprint.html`                                   |
+| `holderKey.existingSecret`               | Name of an existing secret with the holder's EC private key as PEM or JWK (`--key`)                                                                                                                                                           | `""`                                             |
+| `holderKey.existingSecretKey`            | Key of the holder key in `holderKey.existingSecret`                                                                                                                                                                                           | `key.pem`                                        |
+| `issuerKey.existingSecret`               | Name of an existing secret with the issuer's EC private key as PEM or JWK (`--issuer-key`)                                                                                                                                                    | `""`                                             |
+| `issuerKey.existingSecretKey`            | Key of the issuer key in `issuerKey.existingSecret`                                                                                                                                                                                           | `key.pem`                                        |
+| `credentialTemplates.templates`          | Templates by name (`--templates-dir`)                                                                                                                                                                                                         | `{}`                                             |
+| `credentialTemplates.existingConfigMap`  | Name of an existing ConfigMap with one template per key, such as `employee-card.json` (`credentialTemplates.templates` is then ignored)                                                                                                       | `""`                                             |
+| `credentials.items`                      | Entries with an `id` and either a `template` (with optional `claims`, `always_disclosed`, `omit`, `exp` and `display`) or a finished `credential`, and optionally `protected`                                                                 | `[]`                                             |
+| `credentials.existingConfigMap`          | Name of an existing ConfigMap with YAML or JSON credentials files, mounted as a directory (`credentials.items` is then ignored)                                                                                                               | `""`                                             |
+| `extraArgs`                              | Extra arguments for `eudi wallet serve`                                                                                                                                                                                                       | `[]`                                             |
+| `command`                                | Override the default container command (useful when using custom images)                                                                                                                                                                      | `[]`                                             |
+| `args`                                   | Override the default container args (useful when using custom images)                                                                                                                                                                         | `[]`                                             |
+| `extraEnvVars`                           | Array with extra environment variables to add to the eudi-dev container                                                                                                                                                                       | `[]`                                             |
+| `extraEnvVarsCM`                         | Name of existing ConfigMap containing extra env vars for the eudi-dev container                                                                                                                                                               | `""`                                             |
+| `extraEnvVarsSecret`                     | Name of existing Secret containing extra env vars for the eudi-dev container                                                                                                                                                                  | `""`                                             |
 
 ### eudi-dev deployment parameters
 
@@ -344,7 +339,7 @@ The chart sets requests and limits from `resourcesPreset` (`micro` by default). 
 | `resourcesPreset`                                   | Set container resources according to one common preset (allowed values: none, nano, micro, small, medium, large, xlarge, 2xlarge). This is ignored if resources is set (resources is recommended for production). | `micro`          |
 | `resources`                                         | Set container requests and limits for different resources like CPU or memory (essential for production workloads)                                                                                                 | `{}`             |
 | `podSecurityContext.enabled`                        | Enabled eudi-dev pods' Security Context                                                                                                                                                                           | `true`           |
-| `podSecurityContext.fsGroupChangePolicy`            | Set filesystem group change policy                                                                                                                                                                                | `Always`         |
+| `podSecurityContext.fsGroupChangePolicy`            | Set filesystem group change policy                                                                                                                                                                                | `OnRootMismatch` |
 | `podSecurityContext.sysctls`                        | Set kernel settings using the sysctl interface                                                                                                                                                                    | `[]`             |
 | `podSecurityContext.supplementalGroups`             | Set filesystem extra groups                                                                                                                                                                                       | `[]`             |
 | `podSecurityContext.fsGroup`                        | Set eudi-dev pod's Security Context fsGroup                                                                                                                                                                       | `1000`           |
@@ -387,52 +382,52 @@ The chart sets requests and limits from `resourcesPreset` (`micro` by default). 
 
 ### Traffic exposure parameters
 
-| Name                                    | Description                                                                                                                      | Value            |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `service.type`                          | eudi-dev service type                                                                                                            | `ClusterIP`      |
-| `service.ports.http`                    | eudi-dev service HTTP port                                                                                                       | `8085`           |
-| `service.ports.issuer`                  | eudi-dev service port of the wallet's own HTTPS issuer (used when the base URL is http)                                          | `8086`           |
-| `service.nodePorts.http`                | Node port for HTTP                                                                                                               | `""`             |
-| `service.nodePorts.issuer`              | Node port for the issuer                                                                                                         | `""`             |
-| `service.clusterIP`                     | eudi-dev service Cluster IP                                                                                                      | `""`             |
-| `service.loadBalancerIP`                | eudi-dev service Load Balancer IP                                                                                                | `""`             |
-| `service.loadBalancerSourceRanges`      | eudi-dev service Load Balancer sources                                                                                           | `[]`             |
-| `service.externalTrafficPolicy`         | eudi-dev service external traffic policy                                                                                         | `Cluster`        |
-| `service.annotations`                   | Additional custom annotations for eudi-dev service                                                                               | `{}`             |
-| `service.extraPorts`                    | Extra ports to expose in eudi-dev service (normally used with the `sidecars` value)                                              | `[]`             |
-| `service.sessionAffinity`               | Control where client requests go, to the same pod or round-robin                                                                 | `None`           |
-| `service.sessionAffinityConfig`         | Additional settings for the sessionAffinity                                                                                      | `{}`             |
-| `networkPolicy.enabled`                 | Specifies whether a NetworkPolicy should be created                                                                              | `true`           |
-| `networkPolicy.allowExternal`           | Don't require server label for connections                                                                                       | `true`           |
-| `networkPolicy.allowExternalEgress`     | Allow the pod to access any range of port and all destinations.                                                                  | `true`           |
-| `networkPolicy.extraIngress`            | Add extra ingress rules to the NetworkPolicy                                                                                     | `[]`             |
-| `networkPolicy.extraEgress`             | Add extra egress rules to the NetworkPolicy (ignored if allowExternalEgress=true)                                                | `[]`             |
-| `networkPolicy.ingressNSMatchLabels`    | Labels to match to allow traffic from other namespaces                                                                           | `{}`             |
-| `networkPolicy.ingressNSPodMatchLabels` | Pod labels to match to allow traffic from other namespaces                                                                       | `{}`             |
-| `ingress.enabled`                       | Enable ingress record generation for eudi-dev                                                                                    | `false`          |
-| `ingress.pathType`                      | Ingress path type                                                                                                                | `Prefix`         |
-| `ingress.apiVersion`                    | Force Ingress API version (automatically detected if not set)                                                                    | `""`             |
-| `ingress.hostname`                      | Default host for the ingress record                                                                                              | `eudi-dev.local` |
-| `ingress.ingressClassName`              | IngressClass that will be be used to implement the Ingress (Kubernetes 1.18+)                                                    | `""`             |
-| `ingress.path`                          | Ingress path. Empty: the path of `baseURL`, or `/`                                                                               | `""`             |
-| `ingress.wellKnownPaths`                | Add routes for the issuer metadata paths at the host root when the wallet is served under a path prefix                          | `true`           |
-| `ingress.annotations`                   | Additional annotations for the Ingress resource. To enable certificate autogeneration, place here your cert-manager annotations. | `{}`             |
-| `ingress.tls`                           | Enable TLS configuration for the host defined at `ingress.hostname` parameter                                                    | `false`          |
-| `ingress.selfSigned`                    | Create a TLS secret for this ingress record using self-signed certificates generated by Helm                                     | `false`          |
-| `ingress.extraHosts`                    | An array with additional hostname(s) to be covered with the ingress record                                                       | `[]`             |
-| `ingress.extraPaths`                    | An array with additional arbitrary paths that may need to be added to the ingress under the main host                            | `[]`             |
-| `ingress.extraTls`                      | TLS configuration for additional hostname(s) to be covered with this ingress record                                              | `[]`             |
-| `ingress.secrets`                       | Custom TLS certificates as secrets                                                                                               | `[]`             |
-| `ingress.extraRules`                    | Additional rules to be covered with this ingress record                                                                          | `[]`             |
-| `httpRoute.enabled`                     | Enable HTTPRoute generation for eudi-dev                                                                                         | `false`          |
-| `httpRoute.annotations`                 | Additional annotations for the HTTPRoute resource                                                                                | `{}`             |
-| `httpRoute.labels`                      | Additional labels for the HTTPRoute resource                                                                                     | `{}`             |
-| `httpRoute.parentRefs`                  | Gateways the HTTPRoute is attached to. If unspecified, it'll be attached to Gateway named 'gateway' in the same namespace.       | `[]`             |
-| `httpRoute.hostnames`                   | List of hostnames matching HTTP header                                                                                           | `[]`             |
-| `httpRoute.matches`                     | Path matches for the eudi-dev backend. Empty: the path of `baseURL`, or `/`                                                      | `[]`             |
-| `httpRoute.wellKnownPaths`              | Add routes for the issuer metadata paths at the host root when the wallet is served under a path prefix                          | `true`           |
-| `httpRoute.filters`                     | List of filter rules applied to the HTTPRoute for the default svc backend reference                                              | `[]`             |
-| `httpRoute.extraRules`                  | List of extra rules applied to the HTTPRoute                                                                                     | `[]`             |
+| Name                                    | Description                                                                                                                          | Value            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
+| `service.type`                          | eudi-dev service type                                                                                                                | `ClusterIP`      |
+| `service.ports.http`                    | eudi-dev service HTTP port                                                                                                           | `8085`           |
+| `service.ports.issuer`                  | eudi-dev service port of the wallet's own HTTPS issuer (used when the base URL is http)                                              | `8086`           |
+| `service.nodePorts.http`                | Node port for HTTP                                                                                                                   | `""`             |
+| `service.nodePorts.issuer`              | Node port for the issuer                                                                                                             | `""`             |
+| `service.clusterIP`                     | eudi-dev service Cluster IP                                                                                                          | `""`             |
+| `service.loadBalancerIP`                | eudi-dev service Load Balancer IP                                                                                                    | `""`             |
+| `service.loadBalancerSourceRanges`      | eudi-dev service Load Balancer sources                                                                                               | `[]`             |
+| `service.externalTrafficPolicy`         | eudi-dev service external traffic policy                                                                                             | `Cluster`        |
+| `service.annotations`                   | Additional custom annotations for eudi-dev service                                                                                   | `{}`             |
+| `service.extraPorts`                    | Extra ports to expose in eudi-dev service (normally used with the `sidecars` value)                                                  | `[]`             |
+| `service.sessionAffinity`               | Control where client requests go, to the same pod or round-robin                                                                     | `None`           |
+| `service.sessionAffinityConfig`         | Additional settings for the sessionAffinity                                                                                          | `{}`             |
+| `networkPolicy.enabled`                 | Specifies whether a NetworkPolicy should be created                                                                                  | `true`           |
+| `networkPolicy.allowExternal`           | Don't require server label for connections                                                                                           | `true`           |
+| `networkPolicy.allowExternalEgress`     | Allow egress to every destination and port. With `false` the pod can only reach DNS, the database, the proxy ports and `extraEgress` | `true`           |
+| `networkPolicy.extraIngress`            | Add extra ingress rules to the NetworkPolicy                                                                                         | `[]`             |
+| `networkPolicy.extraEgress`             | Add extra egress rules to the NetworkPolicy (ignored if allowExternalEgress=true)                                                    | `[]`             |
+| `networkPolicy.ingressNSMatchLabels`    | Labels to match to allow traffic from other namespaces                                                                               | `{}`             |
+| `networkPolicy.ingressNSPodMatchLabels` | Pod labels to match to allow traffic from other namespaces                                                                           | `{}`             |
+| `ingress.enabled`                       | Enable ingress record generation for eudi-dev                                                                                        | `false`          |
+| `ingress.pathType`                      | Ingress path type                                                                                                                    | `Prefix`         |
+| `ingress.apiVersion`                    | Force Ingress API version (automatically detected if not set)                                                                        | `""`             |
+| `ingress.hostname`                      | Default host for the ingress record                                                                                                  | `eudi-dev.local` |
+| `ingress.ingressClassName`              | IngressClass that will be be used to implement the Ingress (Kubernetes 1.18+)                                                        | `""`             |
+| `ingress.path`                          | Ingress path. Empty: the path of `baseURL`, or `/`                                                                                   | `""`             |
+| `ingress.wellKnownPaths`                | Add routes for the issuer metadata paths at the host root when the wallet is served under a path prefix                              | `true`           |
+| `ingress.annotations`                   | Additional annotations for the Ingress resource. To enable certificate autogeneration, place here your cert-manager annotations.     | `{}`             |
+| `ingress.tls`                           | Enable TLS configuration for the host defined at `ingress.hostname` parameter                                                        | `false`          |
+| `ingress.selfSigned`                    | Create a TLS secret for this ingress record using self-signed certificates generated by Helm                                         | `false`          |
+| `ingress.extraHosts`                    | An array with additional hostname(s) to be covered with the ingress record                                                           | `[]`             |
+| `ingress.extraPaths`                    | An array with additional arbitrary paths that may need to be added to the ingress under the main host                                | `[]`             |
+| `ingress.extraTls`                      | TLS configuration for additional hostname(s) to be covered with this ingress record                                                  | `[]`             |
+| `ingress.secrets`                       | Custom TLS certificates as secrets                                                                                                   | `[]`             |
+| `ingress.extraRules`                    | Additional rules to be covered with this ingress record                                                                              | `[]`             |
+| `httpRoute.enabled`                     | Enable HTTPRoute generation for eudi-dev                                                                                             | `false`          |
+| `httpRoute.annotations`                 | Additional annotations for the HTTPRoute resource                                                                                    | `{}`             |
+| `httpRoute.labels`                      | Additional labels for the HTTPRoute resource                                                                                         | `{}`             |
+| `httpRoute.parentRefs`                  | Gateways the HTTPRoute is attached to (required with `httpRoute.enabled`)                                                            | `[]`             |
+| `httpRoute.hostnames`                   | List of hostnames matching HTTP header                                                                                               | `[]`             |
+| `httpRoute.matches`                     | Path matches for the eudi-dev backend. Empty: the path of `baseURL`, or `/`                                                          | `[]`             |
+| `httpRoute.wellKnownPaths`              | Add routes for the issuer metadata paths at the host root when the wallet is served under a path prefix                              | `true`           |
+| `httpRoute.filters`                     | List of filter rules applied to the HTTPRoute for the default svc backend reference                                                  | `[]`             |
+| `httpRoute.extraRules`                  | List of extra rules applied to the HTTPRoute                                                                                         | `[]`             |
 
 ### Persistence parameters
 
@@ -476,13 +471,13 @@ The chart sets requests and limits from `resourcesPreset` (`micro` by default). 
 
 ## Upgrading
 
+### To 1.0.0
+
+The chart deploys eudi-dev 3.0.0. See the [eudi-dev changelog](https://github.com/dominikschlosser/eudi-dev/blob/main/CHANGELOG.md) for its breaking changes. `credentials` replaces `importCredentials`. Move each imported credential into `credentials.items` as an entry with an `id` and the credential in `credential`. A ConfigMap in `importCredentials.existingConfigMap` becomes a ConfigMap with a YAML file of such entries in `credentials.existingConfigMap`. `pidCredentials` replaces `generatePID`. It issues all predefined PIDs by default. Set `pidCredentials: [pid]` for the EUDI PID that `generatePID` generated. `demoVerifier.issuerCAs` replaces `demoVerifier.trustAnchors`. `demoVerifier.existingIssuerCASecret` and `demoVerifier.existingIssuerCASecretKey` replace `demoVerifier.existingTrustAnchorsSecret` and its key. The chart fails when it finds an old name.
+
 ### To 0.2.0
 
 The chart deploys eudi-dev 2.6.0. The probes call `/healthz` and `/readyz`, which need eudi-dev 2.6.0 or later. With an older `image.tag`, set `customLivenessProbe` and `customReadinessProbe` to `/api/version`.
-
-### To 0.1.0
-
-First release.
 
 ## Contributing
 

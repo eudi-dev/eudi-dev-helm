@@ -1,10 +1,11 @@
 name: Release
 
+# A release runs after CI passed on main. A version that is already tagged is skipped.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    paths:
-      - Chart.yaml
   workflow_dispatch:
 
 permissions:
@@ -16,11 +17,13 @@ env:
 
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: azure/setup-helm@v4
         with:
