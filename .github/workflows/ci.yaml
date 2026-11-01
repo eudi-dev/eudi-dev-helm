@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.x"
 
-      - uses: helm/chart-testing-action@v2.8.0
+      - uses: helm/chart-testing-action@v2.9.0
 
       # Pull requests that change the packaged chart must raise its version.
       - name: Lint
