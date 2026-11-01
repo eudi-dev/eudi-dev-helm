@@ -1,26 +1,26 @@
 <!--- app-name: eudi-dev -->
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dominikschlosser/eudi-dev/main/docs/assets/logo-readme-dark.png">
-    <img src="https://raw.githubusercontent.com/dominikschlosser/eudi-dev/main/docs/assets/logo-readme.png" alt="EUDI Dev Wallet" width="720">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/eudi-dev/eudi-dev/main/docs/assets/logo-readme-dark.png">
+    <img src="https://raw.githubusercontent.com/eudi-dev/eudi-dev/main/docs/assets/logo-readme.png" alt="EUDI Dev Wallet" width="720">
   </picture>
 </p>
 
-<a href="https://github.com/dominikschlosser/eudi-dev-helm/actions/workflows/ci.yaml"><img src="https://github.com/dominikschlosser/eudi-dev-helm/actions/workflows/ci.yaml/badge.svg" alt="CI"></a>
-<a href="https://github.com/dominikschlosser/eudi-dev-helm/releases"><img src="https://img.shields.io/github/v/release/dominikschlosser/eudi-dev-helm" alt="Release"></a>
-<a href="https://github.com/dominikschlosser/eudi-dev"><img src="https://img.shields.io/github/v/release/dominikschlosser/eudi-dev?label=eudi-dev" alt="eudi-dev release"></a>
-<a href="https://github.com/dominikschlosser/eudi-dev-helm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/dominikschlosser/eudi-dev-helm" alt="License"></a>
+<a href="https://github.com/eudi-dev/eudi-dev-helm/actions/workflows/ci.yaml"><img src="https://github.com/eudi-dev/eudi-dev-helm/actions/workflows/ci.yaml/badge.svg" alt="CI"></a>
+<a href="https://github.com/eudi-dev/eudi-dev-helm/releases"><img src="https://img.shields.io/github/v/release/dominikschlosser/eudi-dev-helm" alt="Release"></a>
+<a href="https://github.com/eudi-dev/eudi-dev"><img src="https://img.shields.io/github/v/release/dominikschlosser/eudi-dev?label=eudi-dev" alt="eudi-dev release"></a>
+<a href="https://github.com/eudi-dev/eudi-dev-helm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/dominikschlosser/eudi-dev-helm" alt="License"></a>
 
 # Helm chart for eudi-dev
 
 eudi-dev is a developer test wallet for the EUDI ecosystem. It issues, holds and presents SD-JWT VC and mdoc credentials over OpenID4VCI and OpenID4VP, and comes with a demo issuer and verifier.
 
-[Overview of eudi-dev](https://github.com/dominikschlosser/eudi-dev)
+[Overview of eudi-dev](https://github.com/eudi-dev/eudi-dev)
 
 ## TL;DR
 
 ```console
-helm install my-release oci://ghcr.io/dominikschlosser/charts/eudi-dev
+helm install my-release oci://ghcr.io/eudi-dev/charts/eudi-dev
 ```
 
 ## Introduction
@@ -39,7 +39,7 @@ This chart deploys eudi-dev on a [Kubernetes](https://kubernetes.io) cluster usi
 To install the chart with the release name `my-release`:
 
 ```console
-helm install my-release oci://ghcr.io/dominikschlosser/charts/eudi-dev
+helm install my-release oci://ghcr.io/eudi-dev/charts/eudi-dev
 ```
 
 The command deploys a wallet with PID credentials that approves every request. It is reachable inside the cluster at `http://my-release-eudi-dev.<namespace>.svc.cluster.local:8085`. The [Parameters](#parameters) section lists everything you can configure.
@@ -81,7 +81,7 @@ Use an https URL behind an ingress. With an http URL, the wallet serves its own 
 With more than one replica, keep each browser flow on the same pod, for example with `service.sessionAffinity=ClientIP` or sticky sessions in the ingress. The chart does not deploy a database.
 
 ```console
-helm install my-release oci://ghcr.io/dominikschlosser/charts/eudi-dev \
+helm install my-release oci://ghcr.io/eudi-dev/charts/eudi-dev \
   --set storage.type=postgresql \
   --set externalDatabase.host=postgresql.db.svc.cluster.local \
   --set externalDatabase.existingSecret=eudi-db
@@ -125,11 +125,11 @@ imprint:
 
 ### PID credentials
 
-By default the wallet holds every predefined PID: the EUDI PID and the German, Italian and Dutch PIDs, each as SD-JWT VC and mdoc. `pidCredentials` lists the PID templates by name. The wallet issues them as [startup credentials](https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials) under the template names, so a restart replaces them. Set it to `[]` for a wallet without PIDs, or to `[pid]` for the EUDI PID only. With `demo.enabled` the value has no effect, because the demo profile brings its own PIDs.
+By default the wallet holds every predefined PID: the EUDI PID and the German, Italian and Dutch PIDs, each as SD-JWT VC and mdoc. `pidCredentials` lists the PID templates by name. The wallet issues them as [startup credentials](https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials) under the template names, so a restart replaces them. Set it to `[]` for a wallet without PIDs, or to `[pid]` for the EUDI PID only. With `demo.enabled` the value has no effect, because the demo profile brings its own PIDs.
 
 ### Credential templates and startup credentials
 
-`credentialTemplates.templates` defines [credential templates](https://github.com/dominikschlosser/eudi-dev/blob/main/docs/templates.md) by name. They replace the templates in the storage backend, so saving or deleting a template in the web UI fails while they are set.
+`credentialTemplates.templates` defines [credential templates](https://github.com/eudi-dev/eudi-dev/blob/main/docs/templates.md) by name. They replace the templates in the storage backend, so saving or deleting a template in the web UI fails while they are set.
 
 ```yaml
 credentialTemplates:
@@ -141,7 +141,7 @@ credentialTemplates:
         employee_id: E-1
 ```
 
-`credentials.items` lists [credentials the wallet adds on every start](https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials). An entry issues a credential from a template and sets only what differs from the template's defaults, or it imports a finished credential. A restart replaces each entry under its `id`, so the wallet holds one copy of each. With `demo.enabled` the entries are protected and a demo reset restores them. An entry with `protected: false` can be deleted until the next reset. `credentials.existingConfigMap` mounts a ConfigMap with YAML or JSON files of such entries instead.
+`credentials.items` lists [credentials the wallet adds on every start](https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials). An entry issues a credential from a template and sets only what differs from the template's defaults, or it imports a finished credential. A restart replaces each entry under its `id`, so the wallet holds one copy of each. With `demo.enabled` the entries are protected and a demo reset restores them. An entry with `protected: false` can be deleted until the next reset. `credentials.existingConfigMap` mounts a ConfigMap with YAML or JSON files of such entries instead.
 
 ```yaml
 credentials:
@@ -170,7 +170,7 @@ ingress:
   tls: true
 ```
 
-The specs put issuer metadata at the root of the host, such as `/.well-known/openid-credential-issuer/some/context/issuer`. The ingress and the HTTPRoute add routes for these paths automatically (`ingress.wellKnownPaths`, `httpRoute.wellKnownPaths`). See [behind a reverse proxy](https://github.com/dominikschlosser/eudi-dev/blob/main/docs/reverse-proxy.md) for details.
+The specs put issuer metadata at the root of the host, such as `/.well-known/openid-credential-issuer/some/context/issuer`. The ingress and the HTTPRoute add routes for these paths automatically (`ingress.wellKnownPaths`, `httpRoute.wellKnownPaths`). See [behind a reverse proxy](https://github.com/eudi-dev/eudi-dev/blob/main/docs/reverse-proxy.md) for details.
 
 ### Ingress and Gateway API
 
@@ -471,13 +471,13 @@ The chart sets requests and limits from `resourcesPreset` (`micro` by default). 
 
 ## Troubleshooting
 
-`kubectl logs` on the eudi-dev pod shows every request the wallet handles (as JSON records with `logFormat=json`). The wallet's web UI (see the port-forward command printed after installation) lists its activity and reports protocol problems. Report bugs in the chart at [eudi-dev-helm issues](https://github.com/dominikschlosser/eudi-dev-helm/issues), and bugs in the wallet at [eudi-dev issues](https://github.com/dominikschlosser/eudi-dev/issues).
+`kubectl logs` on the eudi-dev pod shows every request the wallet handles (as JSON records with `logFormat=json`). The wallet's web UI (see the port-forward command printed after installation) lists its activity and reports protocol problems. Report bugs in the chart at [eudi-dev-helm issues](https://github.com/eudi-dev/eudi-dev-helm/issues), and bugs in the wallet at [eudi-dev issues](https://github.com/eudi-dev/eudi-dev/issues).
 
 ## Upgrading
 
 ### To 3.6.0
 
-The chart deploys eudi-dev 3.6.1. See the [eudi-dev changelog](https://github.com/dominikschlosser/eudi-dev/blob/main/CHANGELOG.md) for its breaking changes. `credentials` replaces `importCredentials`. Move each imported credential into `credentials.items` as an entry with an `id` and the credential in `credential`. A ConfigMap in `importCredentials.existingConfigMap` becomes a ConfigMap with a YAML file of such entries in `credentials.existingConfigMap`. `pidCredentials` replaces `generatePID`. It issues all predefined PIDs by default. Set `pidCredentials: [pid]` for the EUDI PID that `generatePID` generated. `demoVerifier.issuerCAs` replaces `demoVerifier.trustAnchors`. `demoVerifier.existingIssuerCASecret` and `demoVerifier.existingIssuerCASecretKey` replace `demoVerifier.existingTrustAnchorsSecret` and its key. The chart fails when it finds an old name.
+The chart deploys eudi-dev 3.6.1. See the [eudi-dev changelog](https://github.com/eudi-dev/eudi-dev/blob/main/CHANGELOG.md) for its breaking changes. `credentials` replaces `importCredentials`. Move each imported credential into `credentials.items` as an entry with an `id` and the credential in `credential`. A ConfigMap in `importCredentials.existingConfigMap` becomes a ConfigMap with a YAML file of such entries in `credentials.existingConfigMap`. `pidCredentials` replaces `generatePID`. It issues all predefined PIDs by default. Set `pidCredentials: [pid]` for the EUDI PID that `generatePID` generated. `demoVerifier.issuerCAs` replaces `demoVerifier.trustAnchors`. `demoVerifier.existingIssuerCASecret` and `demoVerifier.existingIssuerCASecretKey` replace `demoVerifier.existingTrustAnchorsSecret` and its key. The chart fails when it finds an old name.
 
 ### To 0.2.0
 
@@ -485,7 +485,7 @@ The chart deploys eudi-dev 2.6.0. The probes call `/healthz` and `/readyz`, whic
 
 ## Contributing
 
-Issues and pull requests are welcome. [CONTRIBUTING.md](https://github.com/dominikschlosser/eudi-dev-helm/blob/main/CONTRIBUTING.md) explains how to lint, test and release the chart.
+Issues and pull requests are welcome. [CONTRIBUTING.md](https://github.com/eudi-dev/eudi-dev-helm/blob/main/CONTRIBUTING.md) explains how to lint, test and release the chart.
 
 ## License
 

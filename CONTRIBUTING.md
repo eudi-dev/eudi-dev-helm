@@ -35,8 +35,8 @@ The parameter tables in `README.md` come from the `@param` comments in `values.y
 With `--kind` the script creates and deletes its own cluster. Without it, it uses the current kubectl context and deletes only its namespaces. Set `KEEP=true` to keep everything for debugging, and `IMAGE_TAG` (with `LOAD_IMAGE` for a local image) to test another eudi-dev version:
 
 ```console
-docker build -t ghcr.io/dominikschlosser/eudi-dev:dev ../eudi-dev
-IMAGE_TAG=dev LOAD_IMAGE=ghcr.io/dominikschlosser/eudi-dev:dev test/e2e.sh --kind
+docker build -t ghcr.io/eudi-dev/eudi-dev:dev ../eudi-dev
+IMAGE_TAG=dev LOAD_IMAGE=ghcr.io/eudi-dev/eudi-dev:dev test/e2e.sh --kind
 ```
 
 CI lints the chart, checks the README, and runs the tests twice: with the image the chart ships and with an image built from eudi-dev's `main` branch.
@@ -47,4 +47,4 @@ CI lints the chart, checks the README, and runs the tests twice: with the image 
 2. Add an entry to `CHANGELOG.md` and the same changes to the `artifacthub.io/changes` annotation.
 3. Merge to `main`.
 
-Once CI passes on `main`, the release workflow publishes each chart version without a git tag to `oci://ghcr.io/dominikschlosser/charts` and creates a GitHub release with the packaged chart. The release and its git tag are named `v<version>`, such as `v0.1.0`.
+Once CI passes on `main`, the release workflow publishes each chart version without a git tag to `oci://ghcr.io/eudi-dev/charts` and creates a GitHub release with the packaged chart. The release and its git tag are named `v<version>`, such as `v0.1.0`.

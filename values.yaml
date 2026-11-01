@@ -78,7 +78,7 @@ diagnosticMode:
 ## @section eudi-dev parameters
 
 ## eudi-dev image
-## ref: https://github.com/dominikschlosser/eudi-dev/pkgs/container/eudi-dev
+## ref: https://github.com/eudi-dev/eudi-dev/pkgs/container/eudi-dev
 ## @param image.registry eudi-dev image registry
 ## @param image.repository eudi-dev image repository
 ## @param image.tag eudi-dev image tag (immutable tags are recommended)
@@ -106,14 +106,14 @@ image:
 ## @param baseURL Public URL of the wallet, such as https://eudi.example.com or https://example.com/some/context. If empty, the chart uses the ingress URL when the ingress is enabled, otherwise the in-cluster service URL. Required with `httpRoute.enabled`
 ## The wallet builds all URLs in credentials, metadata and requests from it.
 ## Use an https URL behind an ingress. With an http URL, the wallet serves its issuer on a separate port that the ingress does not route.
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/reverse-proxy.md
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/reverse-proxy.md
 ##
 baseURL: ""
 ## @param autoAccept Approve issuance and presentation requests without a consent prompt (`--auto-accept`)
 ##
 autoAccept: true
 ## @param pidCredentials PID templates the wallet issues on every start, each as SD-JWT VC and mdoc (`<name>-sdjwt` and `<name>-mdoc`). They are startup credentials with the template name as id, so a restart replaces them. Empty: no PIDs
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/templates.md
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/templates.md
 ##
 pidCredentials:
   - pid
@@ -124,7 +124,7 @@ pidCredentials:
 ##
 validationMode: debug
 ## Public demo profile
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/public-demo.md
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/public-demo.md
 ##
 demo:
   ## @param demo.enabled Run the hardened public demo profile (`--demo`)
@@ -134,14 +134,14 @@ demo:
   ##
   reset: ""
 ## Where the wallet keeps its state
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet.md#storage-backends
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet.md#storage-backends
 ##
 storage:
   ## @param storage.type Storage backend: `memory` (lost on restart), `file` (on the volume, see `persistence`) or `postgresql` (see `externalDatabase`)
   ##
   type: memory
 ## Seed for the wallet's keys
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet.md#seeded-keys
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet.md#seeded-keys
 ##
 seed:
   ## @param seed.value Seed for deriving the wallet's keys. `auto` uses the public seed `eudi-dev` with memory storage and random keys otherwise. Empty: random keys
@@ -156,7 +156,7 @@ seed:
   ##
   existingSecretKey: seed
 ## @param logFormat Console output format: `text`, or `json` for one JSON record per line with a level and the logging component (`EUDI_DEV_LOG_FORMAT`)
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#json-logs
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/serve.md#json-logs
 ##
 logFormat: text
 ## Certificate checks for outbound HTTPS requests
@@ -174,7 +174,7 @@ tls:
 ## Forward proxy for requests to issuers and verifiers
 ## Requests to in-cluster services (`.svc` and `.<clusterDomain>`) always connect directly.
 ## With `networkPolicy.allowExternalEgress=false`, the NetworkPolicy allows egress on the proxy ports.
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#outbound-proxy
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/serve.md#outbound-proxy
 ##
 outboundProxy:
   ## @param outboundProxy.httpsProxy Proxy for `https://` URLs (`HTTPS_PROXY`)
@@ -190,7 +190,7 @@ outboundProxy:
 ##
 haip: ""
 ## @param arf Check verifiers and issuers against the ARF (access and registration certificates, and the trusted lists of received credentials): `true`, `false`, or empty for the eudi-dev default (on with `demo.enabled`) (`--arf`)
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/presenting.md#arf-checks
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/presenting.md#arf-checks
 ##
 arf: ""
 ## @param relyingPartyCAs PEM CA certificates of other registrars. `arf` trusts them for access and registration certificates in addition to the wallet's own CAs (`--relying-party-ca`)
@@ -214,7 +214,7 @@ statusList: false
 ##
 adhocDisplayImages: false
 ## Wallet behaviour as an OpenID4VCI client
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/issuing.md
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/issuing.md
 ##
 issuance:
   ## @param issuance.vciVersion OpenID4VCI feature level: `1.0`, `1.1`, or empty for the eudi-dev default (`1.0`, `1.1` with `demo.enabled`) (`--vci-version`)
@@ -233,7 +233,7 @@ issuance:
   ##
   keyAttestationLevel: ""
 ## Wallet behaviour in OpenID4VP presentations
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/presenting.md
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/presenting.md
 ##
 presentation:
   ## @param presentation.sessionTranscript mdoc session transcript: `oid4vp` (OpenID4VP 1.0), `iso` (ISO 18013-7), or empty for the eudi-dev default (`oid4vp`) (`--session-transcript`)
@@ -269,7 +269,7 @@ demoVerifier:
   ##
   existingIssuerCASecretKey: ca.crt
 ## Legal notice of the site operator, served at /imprint. Public hosting in the EU requires one.
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/public-demo.md
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/public-demo.md
 ##
 imprint:
   ## @param imprint.html HTML snippet with the legal notice (`--imprint-file`)
@@ -300,7 +300,7 @@ issuerKey:
   ##
   existingSecretKey: key.pem
 ## Credential templates. They replace the templates in the storage backend, and saving or deleting a template in the web UI fails.
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/templates.md
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/templates.md
 ##
 credentialTemplates:
   ## @param credentialTemplates.templates Templates by name (`--templates-dir`)
@@ -319,7 +319,7 @@ credentialTemplates:
 ## Credentials the wallet adds on every start (`--credentials`). An entry issues a credential
 ## from a template with overrides, or imports a finished credential. A restart replaces each
 ## entry under its id, so the wallet holds one copy of each.
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/serve.md#startup-credentials
 ##
 credentials:
   ## @param credentials.items [array] Entries with an `id` and either a `template` (with optional `claims`, `always_disclosed`, `omit`, `exp` and `display`) or a finished `credential`, and optionally `protected`
@@ -337,7 +337,7 @@ credentials:
   ##
   existingConfigMap: ""
 ## Attestation types the wallet pre-registers in its catalogue on every start (`--catalog`).
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#pre-registered-catalogue-entries
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/serve.md#pre-registered-catalogue-entries
 ##
 catalog:
   ## @param catalog.entries [array] Catalogue entries with a `name`, `credentials` and optionally `category` and `schema`
@@ -347,7 +347,7 @@ catalog:
   ##
   existingConfigMap: ""
 ## Verifiers and issuers the wallet registers with its registrar on every start (`--relying-parties`).
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#pre-registered-relying-parties
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/wallet/serve.md#pre-registered-relying-parties
 ##
 relyingParties:
   ## @param relyingParties.registrations [array] Registrations in the shape of `POST /api/registrar/wrp`, each with its `identifier` and the `intendedUseIdentifier` of each intended use
@@ -921,7 +921,7 @@ persistence:
 ## @section Database parameters
 
 ## PostgreSQL database for `storage.type=postgresql`. This chart does not deploy one.
-## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/docker.md#shared-database
+## ref: https://github.com/eudi-dev/eudi-dev/blob/main/docs/docker.md#shared-database
 ##
 externalDatabase:
   ## @param externalDatabase.host Database host

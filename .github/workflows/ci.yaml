@@ -81,10 +81,10 @@ jobs:
       - name: Build eudi-dev from main
         if: matrix.image == 'main'
         run: |
-          docker build -t ghcr.io/dominikschlosser/eudi-dev:main-ci --build-arg VERSION=main eudi-dev
+          docker build -t ghcr.io/eudi-dev/eudi-dev:main-ci --build-arg VERSION=main eudi-dev
           {
             echo "IMAGE_TAG=main-ci"
-            echo "LOAD_IMAGE=ghcr.io/dominikschlosser/eudi-dev:main-ci"
+            echo "LOAD_IMAGE=ghcr.io/eudi-dev/eudi-dev:main-ci"
           } >> "$GITHUB_ENV"
 
       - name: Install the chart and check the wallet

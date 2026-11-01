@@ -7,11 +7,11 @@ annotations:
       image: ghcr.io/eudi-dev/eudi-dev:v3.6.1
   artifacthub.io/links: |
     - name: eudi-dev documentation
-      url: https://github.com/dominikschlosser/eudi-dev/tree/main/docs
+      url: https://github.com/eudi-dev/eudi-dev/tree/main/docs
     - name: Chart source
-      url: https://github.com/dominikschlosser/eudi-dev-helm
+      url: https://github.com/eudi-dev/eudi-dev-helm
     - name: Chart issues
-      url: https://github.com/dominikschlosser/eudi-dev-helm/issues
+      url: https://github.com/eudi-dev/eudi-dev-helm/issues
   artifacthub.io/changes: |
     - kind: added
       description: catalog pre-registers attestation types and relyingParties registers verifiers and issuers on every start
@@ -48,8 +48,8 @@ dependencies:
       - bitnami-common
     version: 2.x.x
 description: Developer test wallet for the EUDI ecosystem with a demo issuer and verifier. Issues, holds and presents SD-JWT VC and mdoc credentials over OpenID4VCI and OpenID4VP.
-home: https://github.com/dominikschlosser/eudi-dev
-icon: https://raw.githubusercontent.com/dominikschlosser/eudi-dev/main/docs/assets/logo-mark.svg
+home: https://github.com/eudi-dev/eudi-dev
+icon: https://raw.githubusercontent.com/eudi-dev/eudi-dev/main/docs/assets/logo-mark.svg
 keywords:
   - eudi
   - wallet
@@ -63,6 +63,6 @@ maintainers:
     url: https://github.com/dominikschlosser
 name: eudi-dev
 sources:
-  - https://github.com/dominikschlosser/eudi-dev
-  - https://github.com/dominikschlosser/eudi-dev-helm
+  - https://github.com/eudi-dev/eudi-dev
+  - https://github.com/eudi-dev/eudi-dev-helm
 version: 3.6.0
