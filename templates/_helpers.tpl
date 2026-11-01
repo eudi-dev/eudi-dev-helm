@@ -154,7 +154,7 @@ issuer CAs, the relying party CAs, the credential templates and the startup cred
 Return true when the chart creates its ConfigMap
 */}}
 {{- define "eudi-dev.createConfigMap" -}}
-{{- if or (and .Values.imprint.html (not .Values.imprint.existingConfigMap)) (and .Values.demoVerifier.issuerCAs (not .Values.demoVerifier.existingIssuerCASecret)) (and .Values.relyingPartyCAs (not .Values.existingRelyingPartyCASecret)) (and .Values.credentialTemplates.templates (not .Values.credentialTemplates.existingConfigMap)) (and .Values.credentials.items (not .Values.credentials.existingConfigMap)) (include "eudi-dev.pidCredentialsEnabled" .) -}}
+{{- if or (and .Values.imprint.html (not .Values.imprint.existingConfigMap)) (and .Values.demoVerifier.issuerCAs (not .Values.demoVerifier.existingIssuerCASecret)) (and .Values.relyingPartyCAs (not .Values.existingRelyingPartyCASecret)) (and .Values.credentialTemplates.templates (not .Values.credentialTemplates.existingConfigMap)) (and .Values.credentials.items (not .Values.credentials.existingConfigMap)) (and .Values.catalog.entries (not .Values.catalog.existingConfigMap)) (and .Values.relyingParties.registrations (not .Values.relyingParties.existingConfigMap)) (include "eudi-dev.pidCredentialsEnabled" .) -}}
     {{- true -}}
 {{- end -}}
 {{- end -}}

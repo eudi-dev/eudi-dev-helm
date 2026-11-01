@@ -32,6 +32,12 @@ data:
   {{- if and .Values.credentials.items (not .Values.credentials.existingConfigMap) }}
   credentials.yaml: {{ dict "credentials" .Values.credentials.items | toYaml | quote }}
   {{- end }}
+  {{- if and .Values.catalog.entries (not .Values.catalog.existingConfigMap) }}
+  catalog.yaml: {{ .Values.catalog.entries | toYaml | quote }}
+  {{- end }}
+  {{- if and .Values.relyingParties.registrations (not .Values.relyingParties.existingConfigMap) }}
+  relying-parties.yaml: {{ .Values.relyingParties.registrations | toYaml | quote }}
+  {{- end }}
   {{- if include "eudi-dev.pidCredentialsEnabled" . }}
   pid-credentials.yaml: {{ include "eudi-dev.pidCredentials" . | quote }}
   {{- end }}

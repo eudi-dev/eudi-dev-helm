@@ -4,7 +4,7 @@ annotations:
   artifacthub.io/prerelease: "false"
   artifacthub.io/images: |
     - name: eudi-dev
-      image: ghcr.io/dominikschlosser/eudi-dev:v3.0.0
+      image: ghcr.io/eudi-dev/eudi-dev:v3.6.1
   artifacthub.io/links: |
     - name: eudi-dev documentation
       url: https://github.com/dominikschlosser/eudi-dev/tree/main/docs
@@ -14,13 +14,17 @@ annotations:
       url: https://github.com/dominikschlosser/eudi-dev-helm/issues
   artifacthub.io/changes: |
     - kind: added
+      description: catalog pre-registers attestation types and relyingParties registers verifiers and issuers on every start
+    - kind: changed
+      description: The chart version follows the major and minor version of eudi-dev
+    - kind: added
       description: arf turns on the ARF checks of verifiers and issuers, and relyingPartyCAs adds the CAs of other registrars
     - kind: added
       description: "Artifact Hub metadata: links, license, category, images and changes"
     - kind: added
       description: The service ports carry appProtocol, so a service mesh detects HTTP and TLS
     - kind: changed
-      description: Deploys eudi-dev 3.0.0
+      description: Deploys eudi-dev 3.6.1
     - kind: changed
       description: credentials replaces importCredentials and issues or imports credentials on every start
     - kind: changed
@@ -36,7 +40,7 @@ annotations:
     - kind: changed
       description: The chart fails on the renamed values
 apiVersion: v2
-appVersion: 3.0.0
+appVersion: 3.6.1
 dependencies:
   - name: common
     repository: oci://registry-1.docker.io/bitnamicharts
@@ -61,4 +65,4 @@ name: eudi-dev
 sources:
   - https://github.com/dominikschlosser/eudi-dev
   - https://github.com/dominikschlosser/eudi-dev-helm
-version: 1.0.0
+version: 3.6.0

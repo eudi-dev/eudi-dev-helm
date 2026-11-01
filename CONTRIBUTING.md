@@ -43,7 +43,7 @@ CI lints the chart, checks the README, and runs the tests twice: with the image 
 
 ## Release
 
-1. Raise `version` in `Chart.yaml` (and `appVersion`, `image.tag` and the `artifacthub.io/images` annotation for a new eudi-dev release).
+1. Raise `version` in `Chart.yaml`. Its major and minor version match the eudi-dev version the chart deploys, as in testcontainers-eudi. Only the patch version counts chart changes (and raise `appVersion`, `image.tag` and the `artifacthub.io/images` annotation for a new eudi-dev release).
 2. Add an entry to `CHANGELOG.md` and the same changes to the `artifacthub.io/changes` annotation.
 3. Merge to `main`.
 

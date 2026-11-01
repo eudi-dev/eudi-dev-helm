@@ -2,17 +2,21 @@
 
 Notable changes by chart version. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.0] - Unreleased
+## [3.6.0] - 2026-11-01
 
 ### Added
 
 - `arf` turns on the ARF checks of verifiers and issuers, and `relyingPartyCAs` adds the CAs of other registrars
 - Artifact Hub metadata: links, license, category, images and changes
 - The service ports carry `appProtocol`, so a service mesh detects HTTP on `http` and TLS on `issuer`
+- `catalog` pre-registers attestation types and `relyingParties` registers verifiers and issuers on every start, inline or from an existing ConfigMap
 
 ### Changed
 
-- Deploys eudi-dev 3.0.0
+- The chart version follows the major and minor version of eudi-dev, so chart 3.6.x deploys eudi-dev 3.6.x. It skips the versions between 0.2.0 and 3.6.0
+- `pidCredentials` alone decides which PIDs the wallet holds. The image no longer adds a second EUDI PID
+- `autoAccept: false` now wins over the default of the image
+- Deploys eudi-dev 3.6.1 from `ghcr.io/eudi-dev/eudi-dev`
 - `credentials` replaces `importCredentials` and issues or imports credentials on every start
 - `pidCredentials` replaces `generatePID`. By default the wallet holds the EUDI, German, Italian and Dutch PIDs, each as SD-JWT VC and mdoc
 - The chart fails when `httpRoute.enabled` is set without `baseURL` or `httpRoute.parentRefs`

@@ -88,8 +88,8 @@ diagnosticMode:
 ##
 image:
   registry: ghcr.io
-  repository: dominikschlosser/eudi-dev
-  tag: v3.0.0
+  repository: eudi-dev/eudi-dev
+  tag: v3.6.1
   digest: ""
   ## Specify a imagePullPolicy
   ## ref: https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images
@@ -334,6 +334,26 @@ credentials:
   ##
   items: []
   ## @param credentials.existingConfigMap Name of an existing ConfigMap with YAML or JSON credentials files, mounted as a directory (`credentials.items` is then ignored)
+  ##
+  existingConfigMap: ""
+## Attestation types the wallet pre-registers in its catalogue on every start (`--catalog`).
+## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#pre-registered-catalogue-entries
+##
+catalog:
+  ## @param catalog.entries [array] Catalogue entries with a `name`, `credentials` and optionally `category` and `schema`
+  ##
+  entries: []
+  ## @param catalog.existingConfigMap Name of an existing ConfigMap with YAML or JSON catalogue files, mounted as a directory (`catalog.entries` is then ignored)
+  ##
+  existingConfigMap: ""
+## Verifiers and issuers the wallet registers with its registrar on every start (`--relying-parties`).
+## ref: https://github.com/dominikschlosser/eudi-dev/blob/main/docs/wallet/serve.md#pre-registered-relying-parties
+##
+relyingParties:
+  ## @param relyingParties.registrations [array] Registrations in the shape of `POST /api/registrar/wrp`, each with its `identifier` and the `intendedUseIdentifier` of each intended use
+  ##
+  registrations: []
+  ## @param relyingParties.existingConfigMap Name of an existing ConfigMap with YAML or JSON registration files, mounted as a directory (`relyingParties.registrations` is then ignored)
   ##
   existingConfigMap: ""
 ## @param extraArgs Extra arguments for `eudi wallet serve`

@@ -98,6 +98,12 @@ spec:
             - --mode={{ .Values.validationMode }}
             {{- if .Values.autoAccept }}
             - --auto-accept
+            {{- else }}
+            - --auto-accept=false
+            {{- end }}
+            {{- if not .Values.demo.enabled }}
+            {{- /* pidCredentials decides which PIDs the wallet holds. The image turns --pid on. */}}
+            - --pid=false
             {{- end }}
             {{- if .Values.demo.enabled }}
             - --demo
@@ -170,6 +176,12 @@ spec:
             {{- end }}
             {{- if include "eudi-dev.startupCredentials" . }}
             - --credentials=/opt/eudi-dev/credentials
+            {{- end }}
+            {{- if or .Values.catalog.entries .Values.catalog.existingConfigMap }}
+            - --catalog=/opt/eudi-dev/catalog
+            {{- end }}
+            {{- if or .Values.relyingParties.registrations .Values.relyingParties.existingConfigMap }}
+            - --relying-parties=/opt/eudi-dev/relying-parties
             {{- end }}
             {{- if .Values.extraArgs }}
             {{- include "common.tplvalues.render" (dict "value" .Values.extraArgs "context" $) | nindent 12 }}
@@ -306,6 +318,16 @@ spec:
               mountPath: /opt/eudi-dev/credentials
               readOnly: true
             {{- end }}
+            {{- if or .Values.catalog.entries .Values.catalog.existingConfigMap }}
+            - name: catalog
+              mountPath: /opt/eudi-dev/catalog
+              readOnly: true
+            {{- end }}
+            {{- if or .Values.relyingParties.registrations .Values.relyingParties.existingConfigMap }}
+            - name: relying-parties
+              mountPath: /opt/eudi-dev/relying-parties
+              readOnly: true
+            {{- end }}
             {{- if .Values.extraVolumeMounts }}
             {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumeMounts "context" $) | nindent 12 }}
             {{- end }}
@@ -410,6 +432,30 @@ spec:
                       path: pid-credentials.yaml
                     {{- end }}
               {{- end }}
+        {{- end }}
+        {{- if .Values.catalog.existingConfigMap }}
+        - name: catalog
+          configMap:
+            name: {{ tpl .Values.catalog.existingConfigMap . }}
+        {{- else if .Values.catalog.entries }}
+        - name: catalog
+          configMap:
+            name: {{ include "eudi-dev.configMapName" . }}
+            items:
+              - key: catalog.yaml
+                path: catalog.yaml
+        {{- end }}
+        {{- if .Values.relyingParties.existingConfigMap }}
+        - name: relying-parties
+          configMap:
+            name: {{ tpl .Values.relyingParties.existingConfigMap . }}
+        {{- else if .Values.relyingParties.registrations }}
+        - name: relying-parties
+          configMap:
+            name: {{ include "eudi-dev.configMapName" . }}
+            items:
+              - key: relying-parties.yaml
+                path: relying-parties.yaml
         {{- end }}
         {{- if .Values.extraVolumes }}
         {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumes "context" $) | nindent 8 }}

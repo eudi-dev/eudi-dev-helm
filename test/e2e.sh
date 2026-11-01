@@ -268,6 +268,8 @@ expect "PID and startup credentials" "$(credential_count 18208)" 10
 expect "imported credential by its id" "$(curl -fs -o /dev/null -w '%{http_code}' http://localhost:18208/api/credentials/imported-employee)" 200
 expect "credential issued from the template" "$(curl -fs http://localhost:18208/api/credentials/issued-employee | json vct)" urn:example:employee
 expect "credential template" "$(curl -fs http://localhost:18208/api/templates/employee-card | json vct)" urn:example:employee
+expect "catalogue entry" "$(curl -fs http://localhost:18208/api/catalog/attestations | grep -c 'Employee card')" 1
+expect "relying party" "$(curl -fs -o /dev/null -w '%{http_code}' 'http://localhost:18208/api/registrar/registration-certificates?identifier=NLTEST.00000042')" 200
 expect "imprint" "$(curl -fs http://localhost:18208/imprint | grep -c 'E2E operator')" 1
 
 log "All checks passed"
