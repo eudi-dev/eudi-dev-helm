@@ -38,6 +38,8 @@ spec:
       {{- include "eudi-dev.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ template "eudi-dev.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      {{- /* A Service named eudi-dev would add EUDI_DEV_PORT and more to the pod, and the wallet reads those as its own settings. */}}
+      enableServiceLinks: false
       {{- if .Values.hostAliases }}
       hostAliases: {{- include "common.tplvalues.render" (dict "value" .Values.hostAliases "context" $) | nindent 8 }}
       {{- end }}

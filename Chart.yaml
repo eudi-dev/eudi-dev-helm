@@ -13,32 +13,8 @@ annotations:
     - name: Chart issues
       url: https://github.com/eudi-dev/eudi-dev-helm/issues
   artifacthub.io/changes: |
-    - kind: added
-      description: catalog pre-registers attestation types and relyingParties registers verifiers and issuers on every start
-    - kind: changed
-      description: The chart version follows the major and minor version of eudi-dev
-    - kind: added
-      description: arf turns on the ARF checks of verifiers and issuers, and relyingPartyCAs adds the CAs of other registrars
-    - kind: added
-      description: "Artifact Hub metadata: links, license, category, images and changes"
-    - kind: added
-      description: The service ports carry appProtocol, so a service mesh detects HTTP and TLS
-    - kind: changed
-      description: Deploys eudi-dev 3.6.1
-    - kind: changed
-      description: credentials replaces importCredentials and issues or imports credentials on every start
-    - kind: changed
-      description: pidCredentials replaces generatePID, and the wallet holds the EUDI, German, Italian and Dutch PIDs by default
-    - kind: changed
-      description: The chart fails when httpRoute.enabled is set without baseURL or httpRoute.parentRefs
-    - kind: changed
-      description: The chart fails when neither baseURL nor the ingress is set and the service ports differ from the container ports
-    - kind: changed
-      description: podSecurityContext.fsGroupChangePolicy defaults to OnRootMismatch
-    - kind: changed
-      description: demoVerifier.issuerCAs and demoVerifier.existingIssuerCASecret replace demoVerifier.trustAnchors and demoVerifier.existingTrustAnchorsSecret
-    - kind: changed
-      description: The chart fails on the renamed values
+    - kind: fixed
+      description: A release named eudi-dev starts
 apiVersion: v2
 appVersion: 3.6.1
 dependencies:
@@ -65,4 +41,4 @@ name: eudi-dev
 sources:
   - https://github.com/eudi-dev/eudi-dev
   - https://github.com/eudi-dev/eudi-dev-helm
-version: 3.6.0
+version: 3.6.1

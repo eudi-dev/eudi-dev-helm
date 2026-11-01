@@ -2,6 +2,12 @@
 
 Notable changes by chart version. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.6.1] - 2026-11-01
+
+### Fixed
+
+- A release named `eudi-dev` starts. Its Service name made Kubernetes add `EUDI_DEV_PORT` and similar variables to the pod, which stopped the wallet
+
 ## [3.6.0] - 2026-11-01
 
 ### Added

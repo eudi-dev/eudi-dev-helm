@@ -272,4 +272,8 @@ expect "catalogue entry" "$(curl -fs http://localhost:18208/api/catalog/attestat
 expect "relying party" "$(curl -fs -o /dev/null -w '%{http_code}' 'http://localhost:18208/api/registrar/registration-certificates?identifier=NLTEST.00000042')" 200
 expect "imprint" "$(curl -fs http://localhost:18208/imprint | grep -c 'E2E operator')" 1
 
+log "A release named eudi-dev: Kubernetes adds no EUDI_DEV_* variables"
+install eudi-dev
+expect "service links" "$(kubectl -n t-eudi-dev get deploy eudi-dev -o jsonpath='{.spec.template.spec.enableServiceLinks}')" false
+
 log "All checks passed"
